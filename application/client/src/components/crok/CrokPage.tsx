@@ -7,7 +7,7 @@ import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/src/components
 import { useHasContentBelow } from "@web-speed-hackathon-2026/client/src/hooks/use_has_content_below";
 
 interface Props {
-  messages: Models.ChatMessage[];
+  messages: Array<Models.ChatMessage & { id: string }>;
   isStreaming: boolean;
   onSendMessage: (message: string) => void;
 }
@@ -27,8 +27,8 @@ export const CrokPage = ({ messages, isStreaming, onSendMessage }: Props) => {
         <div className="mx-auto max-w-2xl px-4 py-8">
           {messages.length === 0 && <WelcomeScreen />}
 
-          {messages.map((message, index) => (
-            <ChatMessage key={index} message={message} />
+          {messages.map((message) => (
+            <ChatMessage key={message.id} message={message} />
           ))}
           <div ref={messagesEndRef} />
         </div>

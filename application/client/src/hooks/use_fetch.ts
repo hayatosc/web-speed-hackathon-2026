@@ -8,7 +8,7 @@ interface ReturnValues<T> {
 
 export function useFetch<T>(
   apiPath: string,
-  fetcher: (apiPath: string) => Promise<T>,
+  fetcher: (apiPath: string, signal?: AbortSignal) => Promise<T>,
 ): ReturnValues<T> {
   const [result, setResult] = useState<ReturnValues<T>>({
     data: null,
@@ -17,14 +17,19 @@ export function useFetch<T>(
   });
 
   useEffect(() => {
+    const controller = new AbortController();
+
     setResult(() => ({
       data: null,
       error: null,
       isLoading: true,
     }));
 
-    void fetcher(apiPath).then(
+    void fetcher(apiPath, controller.signal).then(
       (data) => {
+        if (controller.signal.aborted) {
+          return;
+        }
         setResult((cur) => ({
           ...cur,
           data,
@@ -32,6 +37,9 @@ export function useFetch<T>(
         }));
       },
       (error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
         setResult((cur) => ({
           ...cur,
           error,
@@ -39,6 +47,10 @@ export function useFetch<T>(
         }));
       },
     );
+
+    return () => {
+      controller.abort();
+    };
   }, [apiPath, fetcher]);
 
   return result;

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef } from "react";
+import { ReactNode, useCallback, useEffect, useRef } from "react";
 
 interface Props {
   children: ReactNode;
@@ -8,42 +8,55 @@ interface Props {
 
 export const InfiniteScroll = ({ children, fetchMore, items }: Props) => {
   const latestItem = items[items.length - 1];
+  const lastRequestedItemRef = useRef<Props["items"][number] | undefined>(undefined);
 
-  const prevReachedRef = useRef(false);
+  const requestMore = useCallback(() => {
+    if (latestItem === undefined || lastRequestedItemRef.current === latestItem) {
+      return;
+    }
+
+    lastRequestedItemRef.current = latestItem;
+    fetchMore();
+  }, [fetchMore, latestItem]);
 
   useEffect(() => {
-    const handler = () => {
-      // 念の為 2の18乗 回、最下部かどうかを確認する
-      const hasReached = Array.from(Array(2 ** 18), () => {
-        return window.innerHeight + Math.ceil(window.scrollY) >= document.body.offsetHeight;
-      }).every(Boolean);
+    let frameId = 0;
 
-      // 画面最下部にスクロールしたタイミングで、登録したハンドラを呼び出す
-      if (hasReached && !prevReachedRef.current) {
-        // アイテムがないときは追加で読み込まない
-        if (latestItem !== undefined) {
-          fetchMore();
-        }
+    const checkReachedBottom = () => {
+      frameId = 0;
+      const viewportBottom = window.innerHeight + window.scrollY;
+      const documentBottom = document.documentElement.scrollHeight;
+      if (viewportBottom >= documentBottom - 240) {
+        requestMore();
       }
-
-      prevReachedRef.current = hasReached;
     };
 
-    // 最初は実行されないので手動で呼び出す
-    prevReachedRef.current = false;
-    handler();
+    const scheduleCheck = () => {
+      if (frameId !== 0) {
+        return;
+      }
+      frameId = window.requestAnimationFrame(checkReachedBottom);
+    };
 
-    document.addEventListener("wheel", handler, { passive: false });
-    document.addEventListener("touchmove", handler, { passive: false });
-    document.addEventListener("resize", handler, { passive: false });
-    document.addEventListener("scroll", handler, { passive: false });
+    scheduleCheck();
+
+    window.addEventListener("scroll", scheduleCheck, { passive: true });
+    window.addEventListener("resize", scheduleCheck, { passive: true });
+
     return () => {
-      document.removeEventListener("wheel", handler);
-      document.removeEventListener("touchmove", handler);
-      document.removeEventListener("resize", handler);
-      document.removeEventListener("scroll", handler);
+      window.removeEventListener("scroll", scheduleCheck);
+      window.removeEventListener("resize", scheduleCheck);
+      if (frameId !== 0) {
+        window.cancelAnimationFrame(frameId);
+      }
     };
-  }, [latestItem, fetchMore]);
+  }, [requestMore]);
+
+  useEffect(() => {
+    if (latestItem === undefined) {
+      lastRequestedItemRef.current = undefined;
+    }
+  }, [latestItem]);
 
   return <>{children}</>;
 };

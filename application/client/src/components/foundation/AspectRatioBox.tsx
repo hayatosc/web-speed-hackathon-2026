@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useRef, useState } from "react";
+import { ReactNode, useLayoutEffect, useRef, useState } from "react";
 
 interface Props {
   aspectHeight: number;
@@ -13,18 +13,22 @@ export const AspectRatioBox = ({ aspectHeight, aspectWidth, children }: Props) =
   const ref = useRef<HTMLDivElement>(null);
   const [clientHeight, setClientHeight] = useState(0);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     // clientWidth とアスペクト比から clientHeight を計算する
-    function calcStyle() {
+    const calcStyle = () => {
       const clientWidth = ref.current?.clientWidth ?? 0;
       setClientHeight((clientWidth / aspectWidth) * aspectHeight);
-    }
-    setTimeout(() => calcStyle(), 500);
+    };
 
-    // ウィンドウサイズが変わるたびに計算する
-    window.addEventListener("resize", calcStyle, { passive: false });
+    calcStyle();
+
+    const resizeObserver = new ResizeObserver(calcStyle);
+    if (ref.current !== null) {
+      resizeObserver.observe(ref.current);
+    }
+
     return () => {
-      window.removeEventListener("resize", calcStyle);
+      resizeObserver.disconnect();
     };
   }, [aspectHeight, aspectWidth]);
 

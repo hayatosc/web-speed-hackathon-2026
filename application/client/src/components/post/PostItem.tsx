@@ -24,7 +24,9 @@ export const PostItem = ({ post }: Props) => {
             >
               <img
                 alt={post.user.profileImage.alt}
+                height={56}
                 src={getProfileImagePath(post.user.profileImage.id)}
+                width={56}
               />
             </Link>
           </div>
