@@ -1,4 +1,4 @@
-import { and, desc, gte, like, lte, or } from "drizzle-orm";
+import { and, desc, gte, inArray, like, lte, or } from "drizzle-orm";
 import { Hono } from "hono";
 
 import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
@@ -116,10 +116,12 @@ router.get("/search", async (c) => {
     const userIds = matchingUsers.map((u) => u.id);
 
     if (userIds.length > 0) {
-      // Get posts from those users
-      const userConditions = dateConditions.length > 0 ? and(...dateConditions) : undefined;
+      const userConditions = and(
+        inArray(schema.posts.userId, userIds),
+        ...(dateConditions.length > 0 ? dateConditions : []),
+      );
 
-      const allUserPosts = await db.query.posts.findMany({
+      postsByUser = await db.query.posts.findMany({
         where: userConditions,
         with: {
           user: {
@@ -136,12 +138,9 @@ router.get("/search", async (c) => {
           },
         },
         orderBy: [desc(schema.posts.id)],
+        limit,
+        offset,
       });
-
-      postsByUser = allUserPosts.filter((post) => userIds.includes(post.userId));
-      if (limit) {
-        postsByUser = postsByUser.slice(offset, offset + limit);
-      }
     }
   }
 

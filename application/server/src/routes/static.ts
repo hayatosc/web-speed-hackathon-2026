@@ -48,7 +48,11 @@ router.use("*", async (c, next) => {
     }
   };
 
-  const origPath = path.join(CLIENT_DIST_PATH, reqPath);
+  const origPath = path.resolve(CLIENT_DIST_PATH, reqPath.slice(1));
+  if (!origPath.startsWith(CLIENT_DIST_PATH)) {
+    await next();
+    return;
+  }
 
   if (acceptEncoding.includes("br")) {
     const res = await tryServe(`${origPath}.br`, "br", origPath);
