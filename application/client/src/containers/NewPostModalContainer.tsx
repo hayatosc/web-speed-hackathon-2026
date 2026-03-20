@@ -1,8 +1,7 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { Modal } from "@web-speed-hackathon-2026/client/src/components/modal/Modal";
-import { NewPostModalPage } from "@web-speed-hackathon-2026/client/src/components/new_post_modal/NewPostModalPage";
 import { sendFile, sendJSON } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
 
 interface SubmitParams {
@@ -29,9 +28,27 @@ interface Props {
   id: string;
 }
 
+const LazyNewPostModalPage = lazy(async () => {
+  const { NewPostModalPage } =
+    await import("@web-speed-hackathon-2026/client/src/components/new_post_modal/NewPostModalPage");
+  return { default: NewPostModalPage };
+});
+
+const NewPostModalFallback = ({ id }: { id: string }) => {
+  return (
+    <div className="grid gap-y-6">
+      <h2 id={id} className="text-center text-2xl font-bold">
+        新規投稿
+      </h2>
+      <p className="text-cax-text-muted text-center">フォームを読み込んでいます...</p>
+    </div>
+  );
+};
+
 export const NewPostModalContainer = ({ id }: Props) => {
   const dialogId = useId();
   const ref = useRef<HTMLDialogElement>(null);
+  const [hasOpened, setHasOpened] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   useEffect(() => {
     const element = ref.current;
@@ -40,6 +57,10 @@ export const NewPostModalContainer = ({ id }: Props) => {
     }
 
     const handleToggle = () => {
+      if (element.open) {
+        setHasOpened(true);
+      }
+
       // モーダル開閉時にkeyを更新することでフォームの状態をリセットする
       setResetKey((key) => key + 1);
     };
@@ -76,14 +97,18 @@ export const NewPostModalContainer = ({ id }: Props) => {
 
   return (
     <Modal aria-labelledby={dialogId} id={id} ref={ref} closedby="any">
-      <NewPostModalPage
-        key={resetKey}
-        id={dialogId}
-        hasError={hasError}
-        isLoading={isLoading}
-        onResetError={handleResetError}
-        onSubmit={handleSubmit}
-      />
+      {hasOpened ? (
+        <Suspense fallback={<NewPostModalFallback id={dialogId} />}>
+          <LazyNewPostModalPage
+            key={resetKey}
+            id={dialogId}
+            hasError={hasError}
+            isLoading={isLoading}
+            onResetError={handleResetError}
+            onSubmit={handleSubmit}
+          />
+        </Suspense>
+      ) : null}
     </Modal>
   );
 };
