@@ -10,7 +10,7 @@ test.describe("投稿機能", () => {
     await login(page);
   });
 
-  test("テキストの投稿ができる", async ({ page }) => {
+  test("テキストの投稿ができる @vrt", async ({ page }) => {
     const postText = "テスト投稿";
 
     // 投稿モーダルを開く

@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { dynamicMediaMask, scrollEntire, waitForVisibleMedia } from "./utils";
 
 test.describe("検索ページ", () => {
-  test("検索ページが表示される", async ({ page }) => {
+  test("検索ページが表示される @vrt", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto("/search");
     await scrollEntire(page);
@@ -90,7 +90,7 @@ test.describe("検索ページ", () => {
     });
   });
 
-  test("検索結果が表示される", async ({ page }) => {
+  test("検索結果が表示される @vrt", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto("/search?q=写真");
 

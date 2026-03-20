@@ -18,12 +18,12 @@ if (process.env["CI"]) {
   execSync("pnpm exec playwright install chrome --with-deps", { cwd, stdio: "inherit" });
 }
 
-execSync("pnpm test", {
+execSync("pnpm test:vrt", {
   cwd,
   env: {
     ...process.env,
     E2E_BASE_URL: appUrl,
-    E2E_WORKERS: process.env["E2E_WORKERS"] ?? "2",
+    E2E_WORKERS: process.env["E2E_WORKERS"] ?? "1",
   },
   stdio: "inherit",
 });

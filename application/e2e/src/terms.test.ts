@@ -12,7 +12,7 @@ test.describe("利用規約", () => {
     await expect(page).toHaveTitle("利用規約 - CaX", { timeout: 10_000 });
   });
 
-  test("ページが正しく表示されている", async ({ page }) => {
+  test("ページが正しく表示されている @vrt", async ({ page }) => {
     // VRT: 利用規約
     await scrollEntire(page);
     await waitForVisibleMedia(page);
