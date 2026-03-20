@@ -9,9 +9,15 @@ interface Options {
 let imageMagickInitializationPromise: Promise<void> | null = null;
 
 async function initializeMagick(): Promise<void> {
-  imageMagickInitializationPromise ??= initializeImageMagick(
-    new URL(magickWasmUrl, window.location.href),
-  );
+  if (imageMagickInitializationPromise == null) {
+    imageMagickInitializationPromise = initializeImageMagick(
+      new URL(magickWasmUrl, window.location.href),
+    ).catch((error) => {
+      // Reset so that subsequent calls can retry initialization after a failure.
+      imageMagickInitializationPromise = null;
+      throw error;
+    });
+  }
   await imageMagickInitializationPromise;
 }
 
