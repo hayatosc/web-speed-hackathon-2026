@@ -4,36 +4,171 @@ on:
         types: [opened, reopened, synchronize, closed]
 
 env:
-    FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-    FLY_REGION: nrt
-    FLY_ORG: wsh-2026
+    GCP_PROJECT_ID: web-speed-hackathon-2026
+    GCP_REGION: asia-northeast1
+    CLOUD_RUN_SERVICE: web-speed-hackathon-2026
+    IMAGE: asia-northeast1-docker.pkg.dev/web-speed-hackathon-2026/cloud-run-source-deploy/web-speed-hackathon-2026
 
 jobs:
     review_app:
         runs-on: ubuntu-latest
         outputs:
-            url: ${{ steps.deploy.outputs.url }}
+            url: ${{ steps.get-url.outputs.url }}
         concurrency:
             group: pr-${{ github.event.number }}
 
+        permissions:
+            contents: read
+            pull-requests: write
+            id-token: write
+
         environment:
             name: deployment
-            url: ${{ steps.deploy.outputs.url }}
+            url: ${{ steps.get-url.outputs.url }}
 
         steps:
             - name: Get code
+              if: github.event.action != 'closed'
               uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-            - name: Generate valid app name
-              id: generate-app-name
-              run: |
-                  APP_NAME=$(grep -oP 'app = "\K[^"]+' fly.toml)
-                  APP_NAME="pr-${{ github.event.number }}-${APP_NAME}"
-                  echo "app_name=${APP_NAME}" >> $GITHUB_OUTPUT
-                  echo "Generated app name: ${APP_NAME}"
-
-            - name: Deploy PR app to Fly.io
-              id: deploy
-              uses: superfly/fly-pr-review-apps@5d9f067254bebd0aaa77d908d6337b63f4d4f019
+            - name: Authenticate to Google Cloud
+              uses: google-github-actions/auth@v2
               with:
-                  name: ${{ steps.generate-app-name.outputs.app_name }}
+                  credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+            - name: Set up Cloud SDK
+              uses: google-github-actions/setup-gcloud@v2
+
+            - name: Configure Docker for Artifact Registry
+              if: github.event.action != 'closed'
+              run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+            - name: Build and push Docker image
+              if: github.event.action != 'closed'
+              run: |
+                  docker build \
+                    -t "${{ env.IMAGE }}:pr-${{ github.event.number }}" \
+                    .
+                  docker push "${{ env.IMAGE }}:pr-${{ github.event.number }}"
+
+            - name: Deploy tagged revision to Cloud Run
+              if: github.event.action != 'closed'
+              uses: google-github-actions/deploy-cloudrun@v2
+              with:
+                  service: ${{ env.CLOUD_RUN_SERVICE }}
+                  region: ${{ env.GCP_REGION }}
+                  image: ${{ env.IMAGE }}:pr-${{ github.event.number }}
+                  tag: pr-${{ github.event.number }}
+                  no_traffic: true
+
+            - name: Get preview URL
+              id: get-url
+              if: github.event.action != 'closed'
+              run: |
+                  URL=$(gcloud run services describe ${{ env.CLOUD_RUN_SERVICE }} \
+                    --region ${{ env.GCP_REGION }} \
+                    --format 'value(status.traffic)' \
+                    | tr ';' '\n' \
+                    | grep "pr-${{ github.event.number }}---" \
+                    | grep -oP 'url=\K[^ ]+')
+                  echo "url=${URL}" >> $GITHUB_OUTPUT
+                  echo "Preview URL: ${URL}"
+
+            - name: Remove PR tag on close
+              if: github.event.action == 'closed'
+              run: |
+                  gcloud run services update-traffic ${{ env.CLOUD_RUN_SERVICE }} \
+                    --region ${{ env.GCP_REGION }} \
+                    --remove-tags pr-${{ github.event.number }} \
+                    --quiet
+
+    vrt:
+        needs: review_app
+        if: github.event.action != 'closed'
+        runs-on: ubuntu-latest
+        permissions:
+            pull-requests: write
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+            - name: Setup mise
+              run: |
+                  curl https://mise.run | sh
+                  echo "$HOME/.local/share/mise/bin" >> $GITHUB_PATH
+                  echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
+                  mise install
+              env:
+                  MISE_VERSION: "2025.12.0"
+
+            - name: Download VRT baseline
+              uses: dawidd6/action-download-artifact@v7
+              with:
+                  workflow: update-vrt-baseline.yml
+                  branch: main
+                  name: vrt-baseline
+                  path: application/e2e/src/
+              continue-on-error: true
+
+            - name: Run VRT
+              id: vrt
+              run: |
+                  node --experimental-strip-types scripts/run-vrt.ts "${{ needs.review_app.outputs.url }}" 2>&1 | tee /tmp/vrt-result.txt
+                  echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+              continue-on-error: true
+
+            - name: Post VRT result comment
+              if: always()
+              run: |
+                  if [ "${{ steps.vrt.outputs.exit_code }}" = "0" ]; then
+                    ICON="✅"; LABEL="PASS"
+                  else
+                    ICON="❌"; LABEL="FAIL（差分あり）"
+                  fi
+                  gh pr comment ${{ github.event.number }} \
+                    --body "${ICON} **VRT: ${LABEL}**" \
+                    --repo ${{ github.repository }}
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload Playwright report on failure
+              if: steps.vrt.outputs.exit_code != '0'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-report-pr-${{ github.event.number }}
+                  path: application/e2e/playwright-report/
+                  retention-days: 7
+
+    scoring:
+        needs: review_app
+        if: github.event.action != 'closed'
+        runs-on: ubuntu-latest
+        permissions:
+            pull-requests: write
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+            - name: Setup mise
+              run: |
+                  curl https://mise.run | sh
+                  echo "$HOME/.local/share/mise/bin" >> $GITHUB_PATH
+                  echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
+                  mise install
+              working-directory: scoring-tool
+              env:
+                  MISE_VERSION: "2025.12.0"
+
+            - name: Run scoring
+              run: |
+                  node --experimental-strip-types scripts/run-scoring.ts "${{ needs.review_app.outputs.url }}" 2>&1 | tee /tmp/score.txt || true
+
+            - name: Post scoring result comment
+              run: |
+                  SCORE_BODY=$(cat /tmp/score.txt)
+                  gh pr comment ${{ github.event.number }} \
+                    --body "## Scoring Result
+\`\`\`
+${SCORE_BODY}
+\`\`\`" \
+                    --repo ${{ github.repository }}
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

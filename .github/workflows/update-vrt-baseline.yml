@@ -1,0 +1,51 @@
+name: Update VRT Baseline
+on:
+    workflow_run:
+        workflows: ["Deploy to Production"]
+        types: [completed]
+        branches: [main]
+    workflow_dispatch:
+        inputs:
+            app_url:
+                description: "ベースライン生成対象の URL（空の場合は vars.PRODUCTION_URL を使用）"
+                required: false
+
+jobs:
+    update_baseline:
+        runs-on: ubuntu-latest
+        if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+            - name: Resolve production URL
+              id: resolve_url
+              run: |
+                  INPUT_URL="${{ github.event.inputs.app_url }}"
+                  if [ -n "$INPUT_URL" ]; then
+                    echo "url=$INPUT_URL" >> $GITHUB_OUTPUT
+                  elif [ -n "${{ vars.PRODUCTION_URL }}" ]; then
+                    echo "url=${{ vars.PRODUCTION_URL }}" >> $GITHUB_OUTPUT
+                  else
+                    echo "::error::PRODUCTION_URL が設定されていません。リポジトリ変数 PRODUCTION_URL を設定するか、workflow_dispatch の app_url に指定してください。"
+                    exit 1
+                  fi
+
+            - name: Setup mise
+              run: |
+                  curl https://mise.run | sh
+                  echo "$HOME/.local/share/mise/bin" >> $GITHUB_PATH
+                  echo "$HOME/.local/share/mise/shims" >> $GITHUB_PATH
+                  mise install
+              env:
+                  MISE_VERSION: "2025.12.0"
+
+            - name: Generate VRT baseline
+              run: node --experimental-strip-types scripts/update-vrt-baseline.ts "${{ steps.resolve_url.outputs.url }}"
+
+            - name: Upload baseline as artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: vrt-baseline
+                  path: application/e2e/src/**/*-snapshots/
+                  retention-days: 90
+                  overwrite: true
