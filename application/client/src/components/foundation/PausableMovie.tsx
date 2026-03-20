@@ -71,6 +71,7 @@ export const PausableMovie = ({ src }: Props) => {
           className="group relative block h-full w-full"
           onClick={handleClick}
           type="button"
+          data-prevent-post-navigation="true"
         >
           <canvas ref={canvasCallbackRef} className="w-full" />
           <div
