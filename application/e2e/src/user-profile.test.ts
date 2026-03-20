@@ -14,7 +14,7 @@ test.describe("ユーザー詳細", () => {
     });
   });
 
-  test("ページ上部がユーザーサムネイル画像の色を抽出した色になっている", async ({ page }) => {
+  test("ページ上部がユーザーサムネイル画像の色を抽出した色になっている @vrt", async ({ page }) => {
     await page.goto("/users/o6yq16leo");
 
     const headerDiv = page.locator("header > div").first();

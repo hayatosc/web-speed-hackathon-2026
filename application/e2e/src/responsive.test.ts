@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { dynamicMediaMask, waitForVisibleMedia } from "./utils";
 
 test.describe("レスポンシブ", () => {
-  test("スマホ表示で表示が崩れない", async ({ page }) => {
+  test("スマホ表示で表示が崩れない @vrt", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto("/");
 
@@ -26,7 +26,7 @@ test.describe("レスポンシブ", () => {
     });
   });
 
-  test("デスクトップ表示で表示が崩れない", async ({ page }) => {
+  test("デスクトップ表示で表示が崩れない @vrt", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto("/");
 

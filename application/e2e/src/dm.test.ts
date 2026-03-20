@@ -7,7 +7,7 @@ test.describe("DM一覧", () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
   });
 
-  test("DM一覧が表示される", async ({ page }) => {
+  test("DM一覧が表示される @vrt", async ({ page }) => {
     await page.goto("/dm");
 
     // VRT: DM一覧
@@ -35,7 +35,7 @@ test.describe("DM一覧", () => {
     expect(times).toEqual(sortedTimes);
   });
 
-  test("新規DM開始モーダルが初期仕様通りにバリデーションされること", async ({ page }) => {
+  test("新規DM開始モーダルが初期仕様通りにバリデーションされること @vrt", async ({ page }) => {
     await login(page);
     await page.goto("/dm");
 
@@ -80,7 +80,7 @@ test.describe("DM一覧", () => {
     await expect(page).toHaveScreenshot("dm-新規DM開始モーダル（存在しないユーザー名）.png");
   });
 
-  test("送信ボタンをクリックすると、DM詳細画面に遷移すること", async ({ page }) => {
+  test("送信ボタンをクリックすると、DM詳細画面に遷移すること @vrt", async ({ page }) => {
     await login(page);
     await page.goto("/dm");
 
