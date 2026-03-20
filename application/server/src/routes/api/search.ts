@@ -1,82 +1,152 @@
-import { Router } from "express";
-import { Op } from "sequelize";
+import { and, desc, gte, inArray, like, lte, or } from "drizzle-orm";
+import { Hono } from "hono";
 
-import { Post } from "@web-speed-hackathon-2026/server/src/models";
+import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
 import { parseSearchQuery } from "@web-speed-hackathon-2026/server/src/utils/parse_search_query.js";
 
-export const searchRouter = Router();
+import type { HonoEnv } from "../../types";
 
-searchRouter.get("/search", async (req, res) => {
-  const query = req.query["q"];
+const router = new Hono<HonoEnv>();
+
+// Helper to format post response
+function formatPost(post: {
+  id: string;
+  text: string;
+  createdAt: string;
+  userId: string;
+  movieId: string | null;
+  soundId: string | null;
+  user: {
+    id: string;
+    username: string;
+    name: string;
+    description: string;
+    password: string;
+    profileImageId: string;
+    createdAt: string;
+    profileImage: { id: string; alt: string } | null;
+  };
+  movie: { id: string } | null;
+  sound: { id: string; title: string; artist: string } | null;
+  postImages: Array<{ postId: string; imageId: string; image: { id: string; alt: string; createdAt: string } }>;
+}) {
+  const { userId, movieId, soundId, postImages, user, ...postData } = post;
+  const { profileImageId, password, ...userData } = user;
+
+  // Sort images by createdAt
+  const sortedImages = [...postImages]
+    .sort((a, b) => new Date(a.image.createdAt).getTime() - new Date(b.image.createdAt).getTime())
+    .map((pi) => pi.image);
+
+  return {
+    ...postData,
+    user: {
+      ...userData,
+      profileImage: user.profileImage,
+    },
+    images: sortedImages,
+    movie: post.movie ?? null,
+    sound: post.sound ?? null,
+  };
+}
+
+router.get("/search", async (c) => {
+  const db = getDb();
+  const query = c.req.query("q");
 
   if (typeof query !== "string" || query.trim() === "") {
-    return res.status(200).type("application/json").send([]);
+    return c.json([]);
   }
 
   const { keywords, sinceDate, untilDate } = parseSearchQuery(query);
 
-  // キーワードも日付フィルターもない場合は空配列を返す
   if (!keywords && !sinceDate && !untilDate) {
-    return res.status(200).type("application/json").send([]);
+    return c.json([]);
   }
 
   const searchTerm = keywords ? `%${keywords}%` : null;
-  const limit = req.query["limit"] != null ? Number(req.query["limit"]) : undefined;
-  const offset = req.query["offset"] != null ? Number(req.query["offset"]) : undefined;
+  const limitStr = c.req.query("limit");
+  const offsetStr = c.req.query("offset");
+  const limit = limitStr != null ? Number(limitStr) : undefined;
+  const offset = offsetStr != null ? Number(offsetStr) : 0;
 
-  // 日付条件を構築
-  const dateConditions: Record<symbol, Date>[] = [];
-  if (sinceDate) {
-    dateConditions.push({ [Op.gte]: sinceDate });
-  }
-  if (untilDate) {
-    dateConditions.push({ [Op.lte]: untilDate });
-  }
-  const dateWhere =
-    dateConditions.length > 0 ? { createdAt: Object.assign({}, ...dateConditions) } : {};
+  // Build date conditions
+  const dateConditions: ReturnType<typeof and>[] = [];
+  if (sinceDate) dateConditions.push(gte(schema.posts.createdAt, sinceDate.toISOString()));
+  if (untilDate) dateConditions.push(lte(schema.posts.createdAt, untilDate.toISOString()));
 
-  // テキスト検索条件
-  const textWhere = searchTerm ? { text: { [Op.like]: searchTerm } } : {};
+  // Search by text
+  const textConditions = searchTerm
+    ? [like(schema.posts.text, searchTerm), ...dateConditions]
+    : dateConditions;
 
-  const postsByText = await Post.findAll({
-    limit,
-    offset,
-    where: {
-      ...textWhere,
-      ...dateWhere,
-    },
-  });
+  const postsByText =
+    textConditions.length > 0
+      ? await db.query.posts.findMany({
+          where: textConditions.length === 1 ? textConditions[0] : and(...textConditions),
+          with: {
+            user: {
+              with: {
+                profileImage: true,
+              },
+            },
+            movie: true,
+            sound: true,
+            postImages: {
+              with: {
+                image: true,
+              },
+            },
+          },
+          orderBy: [desc(schema.posts.id)],
+          limit,
+          offset,
+        })
+      : [];
 
-  // ユーザー名/名前での検索（キーワードがある場合のみ）
+  // Search by username/name
   let postsByUser: typeof postsByText = [];
   if (searchTerm) {
-    postsByUser = await Post.findAll({
-      include: [
-        {
-          association: "user",
-          attributes: { exclude: ["profileImageId"] },
-          include: [{ association: "profileImage" }],
-          required: true,
-          where: {
-            [Op.or]: [{ username: { [Op.like]: searchTerm } }, { name: { [Op.like]: searchTerm } }],
+    // Get users matching the search term
+    const matchingUsers = await db.query.users.findMany({
+      where: or(like(schema.users.username, searchTerm), like(schema.users.name, searchTerm)),
+      columns: { id: true },
+    });
+
+    const userIds = matchingUsers.map((u) => u.id);
+
+    if (userIds.length > 0) {
+      const userConditions = and(
+        inArray(schema.posts.userId, userIds),
+        ...(dateConditions.length > 0 ? dateConditions : []),
+      );
+
+      postsByUser = await db.query.posts.findMany({
+        where: userConditions,
+        with: {
+          user: {
+            with: {
+              profileImage: true,
+            },
+          },
+          movie: true,
+          sound: true,
+          postImages: {
+            with: {
+              image: true,
+            },
           },
         },
-        {
-          association: "images",
-          through: { attributes: [] },
-        },
-        { association: "movie" },
-        { association: "sound" },
-      ],
-      limit,
-      offset,
-      where: dateWhere,
-    });
+        orderBy: [desc(schema.posts.id)],
+        limit,
+        offset,
+      });
+    }
   }
 
+  // Merge and deduplicate results
   const postIdSet = new Set<string>();
   const mergedPosts: typeof postsByText = [];
-
   for (const post of [...postsByText, ...postsByUser]) {
     if (!postIdSet.has(post.id)) {
       postIdSet.add(post.id);
@@ -84,9 +154,13 @@ searchRouter.get("/search", async (req, res) => {
     }
   }
 
-  mergedPosts.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  // Sort by createdAt descending
+  mergedPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+  // Apply pagination
   const result = mergedPosts.slice(offset || 0, (offset || 0) + (limit || mergedPosts.length));
 
-  return res.status(200).type("application/json").send(result);
+  return c.json(result.map(formatPost));
 });
+
+export { router as searchRouter };

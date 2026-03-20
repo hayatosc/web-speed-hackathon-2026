@@ -1,11 +1,31 @@
-import session, { MemoryStore } from "express-session";
+import { randomUUID } from "node:crypto";
 
-export const sessionStore = new MemoryStore();
+import { getCookie, setCookie } from "hono/cookie";
 
-export const sessionMiddleware = session({
-  store: sessionStore,
-  proxy: true,
-  resave: false,
-  saveUninitialized: false,
-  secret: "secret",
-});
+import type { Context, Next } from "hono";
+import type { HonoEnv } from "./types";
+
+type Session = { userId?: string };
+
+const COOKIE_NAME = "sid";
+
+export const sessionStore = new Map<string, Session>();
+
+export async function sessionMiddleware(c: Context<HonoEnv>, next: Next): Promise<void> {
+  let sessionId = getCookie(c, COOKIE_NAME);
+
+  if (!sessionId || !sessionStore.has(sessionId)) {
+    sessionId = randomUUID();
+    sessionStore.set(sessionId, {});
+    setCookie(c, COOKIE_NAME, sessionId, {
+      httpOnly: true,
+      path: "/",
+      sameSite: "Lax",
+    });
+  }
+
+  const session = sessionStore.get(sessionId)!;
+  c.set("session", session);
+
+  await next();
+}

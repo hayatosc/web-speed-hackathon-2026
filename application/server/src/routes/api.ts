@@ -1,10 +1,9 @@
-import { Router, NextFunction, Request, Response } from "express";
-import httpErrors from "http-errors";
-import { ValidationError } from "sequelize";
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 
 import { authRouter } from "@web-speed-hackathon-2026/server/src/routes/api/auth";
 import { crokRouter } from "@web-speed-hackathon-2026/server/src/routes/api/crok";
-import { directMessageRouter } from "@web-speed-hackathon-2026/server/src/routes/api/direct_message";
+import { createDirectMessageRouter } from "@web-speed-hackathon-2026/server/src/routes/api/direct_message";
 import { imageRouter } from "@web-speed-hackathon-2026/server/src/routes/api/image";
 import { initializeRouter } from "@web-speed-hackathon-2026/server/src/routes/api/initialize";
 import { movieRouter } from "@web-speed-hackathon-2026/server/src/routes/api/movie";
@@ -13,35 +12,41 @@ import { searchRouter } from "@web-speed-hackathon-2026/server/src/routes/api/se
 import { soundRouter } from "@web-speed-hackathon-2026/server/src/routes/api/sound";
 import { userRouter } from "@web-speed-hackathon-2026/server/src/routes/api/user";
 
-export const apiRouter = Router();
+import type { NodeWebSocket } from "@hono/node-ws";
+import type { HonoEnv } from "../types";
 
-apiRouter.use(initializeRouter);
-apiRouter.use(userRouter);
-apiRouter.use(postRouter);
-apiRouter.use(directMessageRouter);
-apiRouter.use(searchRouter);
-apiRouter.use(movieRouter);
-apiRouter.use(imageRouter);
-apiRouter.use(soundRouter);
-apiRouter.use(authRouter);
-apiRouter.use(crokRouter);
-
-apiRouter.use(async (err: Error, _req: Request, _res: Response, _next: NextFunction) => {
-  if (err instanceof ValidationError) {
-    throw new httpErrors.BadRequest();
+// Custom validation error class for explicit error handling
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
   }
-  throw err;
-});
+}
 
-apiRouter.use(async (err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  if (!httpErrors.isHttpError(err) || err.status === 500) {
+export function createApiRouter(upgradeWebSocket: NodeWebSocket["upgradeWebSocket"]) {
+  const router = new Hono<HonoEnv>();
+
+  router.route("/", initializeRouter);
+  router.route("/", userRouter);
+  router.route("/", postRouter);
+  router.route("/", createDirectMessageRouter(upgradeWebSocket));
+  router.route("/", searchRouter);
+  router.route("/", movieRouter);
+  router.route("/", imageRouter);
+  router.route("/", soundRouter);
+  router.route("/", authRouter);
+  router.route("/", crokRouter);
+
+  router.onError((err, c) => {
+    if (err instanceof ValidationError) {
+      return c.json({ message: "Bad Request" }, 400);
+    }
+    if (err instanceof HTTPException) {
+      return c.json({ message: err.message }, err.status);
+    }
     console.error(err);
-  }
+    return c.json({ message: "Internal Server Error" }, 500);
+  });
 
-  return res
-    .status(httpErrors.isHttpError(err) ? err.status : 500)
-    .type("application/json")
-    .send({
-      message: err.message,
-    });
-});
+  return router;
+}
