@@ -27,7 +27,7 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], channel: "chrome" },
     },
   ],
-  reporter: "list",
+  reporter: [["list"], ["html", { open: "never" }]],
   retries: 1,
   testDir: "./src",
   timeout: 300_000,

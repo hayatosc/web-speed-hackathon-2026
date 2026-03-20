@@ -1,0 +1,119 @@
+name: Deploy to Production
+on:
+    push:
+        branches: [main]
+    workflow_dispatch:
+        inputs:
+            app_url:
+                description: "ベースライン生成対象の URL（空の場合は push 時の deploy URL、または vars.PRODUCTION_URL を使用）"
+                required: false
+
+env:
+    GCP_PROJECT_ID: web-speed-hackathon-2026
+    GCP_REGION: asia-northeast1
+    CLOUD_RUN_SERVICE: web-speed-hackathon-2026
+    IMAGE: asia-northeast1-docker.pkg.dev/web-speed-hackathon-2026/cloud-run-source-deploy/web-speed-hackathon-2026
+    PRODUCTION_MIN_INSTANCES: "1"
+    PRODUCTION_MAX_INSTANCES: "1"
+
+jobs:
+    deploy:
+        if: github.event_name == 'push'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            id-token: write
+        outputs:
+            url: ${{ steps.production_url.outputs.url }}
+
+        environment:
+            name: production
+            url: ${{ steps.production_url.outputs.url }}
+
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+            - name: Authenticate to Google Cloud
+              uses: google-github-actions/auth@v2
+              with:
+                  credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+            - name: Set up Cloud SDK
+              uses: google-github-actions/setup-gcloud@v2
+
+            - name: Configure Docker for Artifact Registry
+              run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+            - name: Build and push Docker image
+              run: |
+                  docker build \
+                    -t "${{ env.IMAGE }}:${{ github.sha }}" \
+                    -t "${{ env.IMAGE }}:latest" \
+                    .
+                  docker push "${{ env.IMAGE }}:${{ github.sha }}"
+                  docker push "${{ env.IMAGE }}:latest"
+
+            - name: Deploy to Cloud Run
+              run: |
+                  gcloud run deploy "${{ env.CLOUD_RUN_SERVICE }}" \
+                    --project "${{ env.GCP_PROJECT_ID }}" \
+                    --region "${{ env.GCP_REGION }}" \
+                    --image "${{ env.IMAGE }}:${{ github.sha }}" \
+                    --min-instances "${{ env.PRODUCTION_MIN_INSTANCES }}" \
+                    --max-instances "${{ env.PRODUCTION_MAX_INSTANCES }}" \
+                    --labels "managed-by=github-actions,environment=production" \
+                    --quiet
+
+            - name: Get production URL
+              id: production_url
+              run: |
+                  URL=$(gcloud run services describe "${{ env.CLOUD_RUN_SERVICE }}" \
+                    --project "${{ env.GCP_PROJECT_ID }}" \
+                    --region "${{ env.GCP_REGION }}" \
+                    --format 'value(status.url)')
+                  echo "url=${URL}" >> "$GITHUB_OUTPUT"
+                  echo "Production URL: ${URL}"
+
+    update_baseline:
+        needs: deploy
+        if: always() && ((github.event_name == 'push' && needs.deploy.result == 'success') || github.event_name == 'workflow_dispatch')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+              with:
+                  ref: ${{ github.sha }}
+
+            - name: Resolve production URL
+              id: resolve_url
+              run: |
+                  INPUT_URL="${{ github.event.inputs.app_url }}"
+                  DEPLOY_URL="${{ needs.deploy.outputs.url }}"
+                  if [ -n "$INPUT_URL" ]; then
+                    echo "url=$INPUT_URL" >> "$GITHUB_OUTPUT"
+                  elif [ -n "$DEPLOY_URL" ]; then
+                    echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+                  elif [ -n "${{ vars.PRODUCTION_URL }}" ]; then
+                    echo "url=${{ vars.PRODUCTION_URL }}" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "::error::PRODUCTION_URL が設定されていません。workflow_dispatch の app_url に指定するか、リポジトリ変数 PRODUCTION_URL を設定してください。"
+                    exit 1
+                  fi
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  version: "2025.12.0"
+                  cache: true
+
+            - name: Generate VRT baseline
+              run: node --experimental-strip-types scripts/update-vrt-baseline.ts "${{ steps.resolve_url.outputs.url }}"
+
+            - name: Upload baseline as artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: vrt-baseline
+                  path: application/e2e/src/**/*-snapshots/
+                  retention-days: 90
+                  overwrite: true

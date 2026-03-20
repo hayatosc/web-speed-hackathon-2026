@@ -4,36 +4,257 @@ on:
         types: [opened, reopened, synchronize, closed]
 
 env:
-    FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-    FLY_REGION: nrt
-    FLY_ORG: wsh-2026
+    GCP_PROJECT_ID: web-speed-hackathon-2026
+    GCP_REGION: asia-northeast1
+    CLOUD_RUN_SERVICE: web-speed-hackathon-2026
+    IMAGE: asia-northeast1-docker.pkg.dev/web-speed-hackathon-2026/cloud-run-source-deploy/web-speed-hackathon-2026
+    PREVIEW_MIN_INSTANCES: "1"
+    PREVIEW_MAX_INSTANCES: "1"
+
+concurrency:
+    group: pr-${{ github.event.number }}
+    cancel-in-progress: true
 
 jobs:
-    review_app:
+    deploy_preview:
         runs-on: ubuntu-latest
+        # fork からの PR はシークレットが提供されないためスキップ
+        if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
         outputs:
-            url: ${{ steps.deploy.outputs.url }}
-        concurrency:
-            group: pr-${{ github.event.number }}
+            url: ${{ steps.preview_url.outputs.url }}
+            service: ${{ steps.naming.outputs.service }}
+
+        permissions:
+            contents: read
+            id-token: write
 
         environment:
             name: deployment
-            url: ${{ steps.deploy.outputs.url }}
+            url: ${{ steps.preview_url.outputs.url }}
 
         steps:
             - name: Get code
               uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
-            - name: Generate valid app name
-              id: generate-app-name
-              run: |
-                  APP_NAME=$(grep -oP 'app = "\K[^"]+' fly.toml)
-                  APP_NAME="pr-${{ github.event.number }}-${APP_NAME}"
-                  echo "app_name=${APP_NAME}" >> $GITHUB_OUTPUT
-                  echo "Generated app name: ${APP_NAME}"
-
-            - name: Deploy PR app to Fly.io
-              id: deploy
-              uses: superfly/fly-pr-review-apps@5d9f067254bebd0aaa77d908d6337b63f4d4f019
+            - name: Authenticate to Google Cloud
+              uses: google-github-actions/auth@v2
               with:
-                  name: ${{ steps.generate-app-name.outputs.app_name }}
+                  credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+            - name: Set up Cloud SDK
+              uses: google-github-actions/setup-gcloud@v2
+
+            - name: Resolve preview service name
+              id: naming
+              run: |
+                  base="${{ env.CLOUD_RUN_SERVICE }}"
+                  base="$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-')"
+                  base="${base#-}"
+                  base="${base%-}"
+                  suffix="pr-${{ github.event.number }}"
+                  max_base_len=$((49 - ${#suffix} - 1))
+                  if [ "$max_base_len" -lt 1 ]; then
+                    echo "::error::Preview service name budget is too small"
+                    exit 1
+                  fi
+                  base="${base:0:max_base_len}"
+                  base="${base%-}"
+                  if [ -z "$base" ]; then
+                    echo "::error::Preview service name is empty after normalization"
+                    exit 1
+                  fi
+                  echo "service=${base}-${suffix}" >> "$GITHUB_OUTPUT"
+
+            - name: Configure Docker for Artifact Registry
+              run: gcloud auth configure-docker ${{ env.GCP_REGION }}-docker.pkg.dev --quiet
+
+            - name: Build and push Docker image
+              run: |
+                  docker build \
+                    -t "${{ env.IMAGE }}:pr-${{ github.event.number }}" \
+                    .
+                  docker push "${{ env.IMAGE }}:pr-${{ github.event.number }}"
+
+            - name: Deploy preview service to Cloud Run
+              run: |
+                  gcloud run deploy "${{ steps.naming.outputs.service }}" \
+                    --project "${{ env.GCP_PROJECT_ID }}" \
+                    --region "${{ env.GCP_REGION }}" \
+                    --image "${{ env.IMAGE }}:pr-${{ github.event.number }}" \
+                    --min-instances "${{ env.PREVIEW_MIN_INSTANCES }}" \
+                    --max-instances "${{ env.PREVIEW_MAX_INSTANCES }}" \
+                    --labels "managed-by=github-actions,environment=preview,pr=${{ github.event.number }}" \
+                    --quiet
+
+            - name: Get preview URL
+              id: preview_url
+              run: |
+                  URL=$(gcloud run services describe "${{ steps.naming.outputs.service }}" \
+                    --project "${{ env.GCP_PROJECT_ID }}" \
+                    --region "${{ env.GCP_REGION }}" \
+                    --format 'value(status.url)')
+                  echo "url=${URL}" >> "$GITHUB_OUTPUT"
+                  echo "Preview URL: ${URL}"
+
+    cleanup_preview:
+        runs-on: ubuntu-latest
+        if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+        permissions:
+            contents: read
+            id-token: write
+        steps:
+            - name: Authenticate to Google Cloud
+              uses: google-github-actions/auth@v2
+              with:
+                  credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+            - name: Set up Cloud SDK
+              uses: google-github-actions/setup-gcloud@v2
+
+            - name: Resolve preview service name
+              id: naming
+              run: |
+                  base="${{ env.CLOUD_RUN_SERVICE }}"
+                  base="$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-')"
+                  base="${base#-}"
+                  base="${base%-}"
+                  suffix="pr-${{ github.event.number }}"
+                  max_base_len=$((49 - ${#suffix} - 1))
+                  if [ "$max_base_len" -lt 1 ]; then
+                    echo "::error::Preview service name budget is too small"
+                    exit 1
+                  fi
+                  base="${base:0:max_base_len}"
+                  base="${base%-}"
+                  if [ -z "$base" ]; then
+                    echo "::error::Preview service name is empty after normalization"
+                    exit 1
+                  fi
+                  echo "service=${base}-${suffix}" >> "$GITHUB_OUTPUT"
+
+            - name: Delete preview service on close
+              run: |
+                  if gcloud run services describe "${{ steps.naming.outputs.service }}" \
+                    --project "${{ env.GCP_PROJECT_ID }}" \
+                    --region "${{ env.GCP_REGION }}" \
+                    --format 'value(status.url)' >/dev/null 2>&1; then
+                    gcloud run services delete "${{ steps.naming.outputs.service }}" \
+                      --project "${{ env.GCP_PROJECT_ID }}" \
+                      --region "${{ env.GCP_REGION }}" \
+                      --quiet
+                  else
+                    echo "Preview service already deleted"
+                  fi
+
+            - name: Delete preview image tag on close
+              run: |
+                  if gcloud artifacts docker images delete "${{ env.IMAGE }}:pr-${{ github.event.number }}" \
+                    --delete-tags \
+                    --quiet; then
+                    echo "Preview image deleted"
+                  else
+                    echo "Preview image already deleted or unavailable"
+                  fi
+
+    vrt:
+        needs: deploy_preview
+        if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            actions: read
+            pull-requests: write
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  version: "2025.12.0"
+                  cache: true
+
+            - name: Download VRT baseline
+              id: download-baseline
+              uses: dawidd6/action-download-artifact@v7
+              with:
+                  workflow: deploy-main.yml
+                  branch: main
+                  name: vrt-baseline
+                  path: application/e2e/src/
+              continue-on-error: true
+
+            - name: Check baseline availability
+              id: check-baseline
+              run: |
+                  count=$(find application/e2e/src -name "*.png" -path "*-snapshots*" 2>/dev/null | wc -l)
+                  if [ "$count" -gt 0 ]; then
+                    echo "available=true" >> $GITHUB_OUTPUT
+                  else
+                    echo "available=false" >> $GITHUB_OUTPUT
+                  fi
+
+            - name: Run VRT
+              id: vrt
+              if: steps.check-baseline.outputs.available == 'true'
+              run: |
+                  node --experimental-strip-types scripts/run-vrt.ts "${{ needs.deploy_preview.outputs.url }}" 2>&1 | tee /tmp/vrt-result.txt
+                  echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+              continue-on-error: true
+
+            - name: Post VRT result comment
+              if: always()
+              run: |
+                  if [ "${{ steps.check-baseline.outputs.available }}" = "false" ]; then
+                    ICON="⚠️"; LABEL="スキップ（ベースライン未生成）"
+                  elif [ "${{ steps.vrt.outputs.exit_code }}" = "0" ]; then
+                    ICON="✅"; LABEL="PASS"
+                  else
+                    ICON="❌"; LABEL="FAIL（差分あり）"
+                  fi
+                  gh pr comment ${{ github.event.number }} \
+                    --body "${ICON} **VRT: ${LABEL}**" \
+                    --repo ${{ github.repository }}
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload Playwright report on failure
+              if: steps.check-baseline.outputs.available == 'true' && steps.vrt.outputs.exit_code != '0'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-report-pr-${{ github.event.number }}
+                  path: application/e2e/playwright-report/
+                  retention-days: 7
+
+    scoring:
+        needs: deploy_preview
+        if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: write
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  version: "2025.12.0"
+                  cache: true
+
+            - name: Run scoring
+              run: |
+                  node --experimental-strip-types scripts/run-scoring.ts "${{ needs.deploy_preview.outputs.url }}" 2>&1 | tee /tmp/score.txt || true
+
+            - name: Post scoring result comment
+              run: |
+                  SCORE_BODY=$(cat /tmp/score.txt)
+                  {
+                    printf '## Scoring Result\n```text\n'
+                    printf '%s\n' "$SCORE_BODY"
+                    printf '```\n'
+                  } > /tmp/score-comment.md
+                  gh pr comment ${{ github.event.number }} \
+                    --body-file /tmp/score-comment.md \
+                    --repo ${{ github.repository }}
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
