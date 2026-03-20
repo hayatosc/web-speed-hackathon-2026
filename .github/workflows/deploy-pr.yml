@@ -81,6 +81,7 @@ jobs:
                     --project "${{ env.GCP_PROJECT_ID }}" \
                     --region "${{ env.GCP_REGION }}" \
                     --image "${{ env.IMAGE }}:pr-${{ github.event.number }}" \
+                    --allow-unauthenticated \
                     --min-instances "${{ env.PREVIEW_MIN_INSTANCES }}" \
                     --max-instances "${{ env.PREVIEW_MAX_INSTANCES }}" \
                     --labels "managed-by=github-actions,environment=preview,pr=${{ github.event.number }}" \
