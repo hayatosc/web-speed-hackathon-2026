@@ -1,7 +1,8 @@
-import history from "connect-history-api-fallback";
-import { Router } from "express";
-import expressStaticGzip from "express-static-gzip";
-import serveStatic from "serve-static";
+import fs from "node:fs/promises";
+import path from "node:path";
+
+import { serveStatic } from "@hono/node-server/serve-static";
+import { Hono } from "hono";
 
 import {
   CLIENT_DIST_PATH,
@@ -9,32 +10,92 @@ import {
   UPLOAD_PATH,
 } from "@web-speed-hackathon-2026/server/src/paths";
 
-export const staticRouter = Router();
+const MIME_TYPES: Record<string, string> = {
+  css: "text/css",
+  html: "text/html",
+  js: "text/javascript",
+  json: "application/json",
+  svg: "image/svg+xml",
+  wasm: "application/wasm",
+};
 
-// SPA 対応のため、ファイルが存在しないときに index.html を返す
-staticRouter.use(history());
+const router = new Hono();
 
-staticRouter.use(
-  serveStatic(UPLOAD_PATH, {
-    etag: false,
-    lastModified: false,
+// Pre-compressed ファイル配信（クライアントビルド成果物向け）
+router.use("*", async (c, next) => {
+  const reqPath = new URL(c.req.url).pathname;
+  const acceptEncoding = c.req.header("accept-encoding") ?? "";
+
+  const tryServe = async (
+    compPath: string,
+    encoding: string,
+    origPath: string,
+  ): Promise<Response | null> => {
+    try {
+      await fs.access(compPath);
+      const content = await fs.readFile(compPath);
+      const ext = path.extname(origPath).slice(1);
+      const contentType = MIME_TYPES[ext] ?? "application/octet-stream";
+      return new Response(content as unknown as BodyInit, {
+        headers: {
+          "Cache-Control": "public, max-age=31536000, immutable",
+          "Content-Encoding": encoding,
+          "Content-Type": contentType,
+        },
+      });
+    } catch {
+      return null;
+    }
+  };
+
+  const origPath = path.join(CLIENT_DIST_PATH, reqPath);
+
+  if (acceptEncoding.includes("br")) {
+    const res = await tryServe(`${origPath}.br`, "br", origPath);
+    if (res) return res;
+  }
+  if (acceptEncoding.includes("gzip")) {
+    const res = await tryServe(`${origPath}.gz`, "gzip", origPath);
+    if (res) return res;
+  }
+
+  await next();
+  return;
+});
+
+// アップロードファイル配信
+router.use(
+  "*",
+  serveStatic({
+    root: path.relative(process.cwd(), UPLOAD_PATH),
   }),
 );
 
-staticRouter.use(
-  serveStatic(PUBLIC_PATH, {
-    etag: false,
-    lastModified: false,
+// パブリックファイル配信
+router.use(
+  "*",
+  serveStatic({
+    root: path.relative(process.cwd(), PUBLIC_PATH),
   }),
 );
 
-staticRouter.use(
-  expressStaticGzip(CLIENT_DIST_PATH, {
-    enableBrotli: true,
-    orderPreference: ["br", "gz"],
-    serveStatic: {
-      etag: false,
-      lastModified: false,
-    },
+// クライアントビルド成果物配信
+router.use(
+  "*",
+  serveStatic({
+    root: path.relative(process.cwd(), CLIENT_DIST_PATH),
   }),
 );
+
+// SPA フォールバック
+router.use("*", async (c) => {
+  const indexPath = path.join(CLIENT_DIST_PATH, "index.html");
+  try {
+    const html = await fs.readFile(indexPath, "utf-8");
+    return c.html(html);
+  } catch {
+    return c.text("Not Found", 404);
+  }
+});
+
+export { router as staticRouter };

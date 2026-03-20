@@ -1,21 +1,20 @@
 import fs from "node:fs/promises";
 
-import { Router } from "express";
+import { Hono } from "hono";
 
 import { UPLOAD_PATH } from "@web-speed-hackathon-2026/server/src/paths";
+import { sessionStore } from "@web-speed-hackathon-2026/server/src/session";
 
 import { initializeSequelize } from "../../sequelize";
-import { sessionStore } from "../../session";
+import type { HonoEnv } from "../../types";
 
-export const initializeRouter = Router();
+const router = new Hono<HonoEnv>();
 
-initializeRouter.post("/initialize", async (_req, res) => {
-  // DBリセット
+router.post("/initialize", async (c) => {
   await initializeSequelize();
-  // sessionStoreをクリア
   sessionStore.clear();
-  // uploadディレクトリをクリア
   await fs.rm(UPLOAD_PATH, { force: true, recursive: true });
-
-  return res.status(200).type("application/json").send({});
+  return c.json({});
 });
+
+export { router as initializeRouter };

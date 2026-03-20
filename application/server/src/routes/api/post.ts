@@ -1,62 +1,57 @@
-import { Router } from "express";
-import httpErrors from "http-errors";
+import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 
 import { Comment, Post } from "@web-speed-hackathon-2026/server/src/models";
 
-export const postRouter = Router();
+import type { HonoEnv } from "../../types";
 
-postRouter.get("/posts", async (req, res) => {
+const router = new Hono<HonoEnv>();
+
+router.get("/posts", async (c) => {
+  const limitStr = c.req.query("limit");
+  const offsetStr = c.req.query("offset");
   const posts = await Post.findAll({
-    limit: req.query["limit"] != null ? Number(req.query["limit"]) : undefined,
-    offset: req.query["offset"] != null ? Number(req.query["offset"]) : undefined,
+    limit: limitStr != null ? Number(limitStr) : undefined,
+    offset: offsetStr != null ? Number(offsetStr) : undefined,
   });
-
-  return res.status(200).type("application/json").send(posts);
+  return c.json(posts);
 });
 
-postRouter.get("/posts/:postId", async (req, res) => {
-  const post = await Post.findByPk(req.params.postId);
-
+router.get("/posts/:postId", async (c) => {
+  const post = await Post.findByPk(c.req.param("postId"));
   if (post === null) {
-    throw new httpErrors.NotFound();
+    throw new HTTPException(404);
   }
-
-  return res.status(200).type("application/json").send(post);
+  return c.json(post);
 });
 
-postRouter.get("/posts/:postId/comments", async (req, res) => {
+router.get("/posts/:postId/comments", async (c) => {
+  const limitStr = c.req.query("limit");
+  const offsetStr = c.req.query("offset");
   const posts = await Comment.findAll({
-    limit: req.query["limit"] != null ? Number(req.query["limit"]) : undefined,
-    offset: req.query["offset"] != null ? Number(req.query["offset"]) : undefined,
-    where: {
-      postId: req.params.postId,
-    },
+    limit: limitStr != null ? Number(limitStr) : undefined,
+    offset: offsetStr != null ? Number(offsetStr) : undefined,
+    where: { postId: c.req.param("postId") },
   });
-
-  return res.status(200).type("application/json").send(posts);
+  return c.json(posts);
 });
 
-postRouter.post("/posts", async (req, res) => {
-  if (req.session.userId === undefined) {
-    throw new httpErrors.Unauthorized();
+router.post("/posts", async (c) => {
+  if (c.get("session").userId === undefined) {
+    throw new HTTPException(401);
   }
-
+  const body = await c.req.json();
   const post = await Post.create(
-    {
-      ...req.body,
-      userId: req.session.userId,
-    },
+    { ...body, userId: c.get("session").userId },
     {
       include: [
-        {
-          association: "images",
-          through: { attributes: [] },
-        },
+        { association: "images", through: { attributes: [] } },
         { association: "movie" },
         { association: "sound" },
       ],
     },
   );
-
-  return res.status(200).type("application/json").send(post);
+  return c.json(post);
 });
+
+export { router as postRouter };

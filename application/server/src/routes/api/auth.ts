@@ -1,48 +1,51 @@
-import { Router } from "express";
-import httpErrors from "http-errors";
+import { Hono } from "hono";
 import { UniqueConstraintError, ValidationError } from "sequelize";
 
 import { User } from "@web-speed-hackathon-2026/server/src/models";
 
-export const authRouter = Router();
+import type { HonoEnv } from "../../types";
 
-authRouter.post("/signup", async (req, res) => {
+const router = new Hono<HonoEnv>();
+
+router.post("/signup", async (c) => {
   try {
-    const { id: userId } = await User.create(req.body);
+    const body = await c.req.json();
+    const { id: userId } = await User.create(body);
     const user = await User.findByPk(userId);
 
-    req.session.userId = userId;
-    return res.status(200).type("application/json").send(user);
+    c.get("session").userId = userId;
+    return c.json(user);
   } catch (err) {
     if (err instanceof UniqueConstraintError) {
-      return res.status(400).type("application/json").send({ code: "USERNAME_TAKEN" });
+      return c.json({ code: "USERNAME_TAKEN" }, 400);
     }
     if (err instanceof ValidationError) {
-      return res.status(400).type("application/json").send({ code: "INVALID_USERNAME" });
+      return c.json({ code: "INVALID_USERNAME" }, 400);
     }
     throw err;
   }
 });
 
-authRouter.post("/signin", async (req, res) => {
+router.post("/signin", async (c) => {
+  const body = await c.req.json();
   const user = await User.findOne({
-    where: {
-      username: req.body.username,
-    },
+    where: { username: body.username },
   });
 
   if (user === null) {
-    throw new httpErrors.BadRequest();
+    return c.json({ message: "Bad Request" }, 400);
   }
-  if (!user.validPassword(req.body.password)) {
-    throw new httpErrors.BadRequest();
+  if (!user.validPassword(body.password)) {
+    return c.json({ message: "Bad Request" }, 400);
   }
 
-  req.session.userId = user.id;
-  return res.status(200).type("application/json").send(user);
+  c.get("session").userId = user.id;
+  return c.json(user);
 });
 
-authRouter.post("/signout", async (req, res) => {
-  req.session.userId = undefined;
-  return res.status(200).type("application/json").send({});
+router.post("/signout", async (c) => {
+  c.get("session").userId = undefined;
+  return c.json({});
 });
+
+export { router as authRouter };
