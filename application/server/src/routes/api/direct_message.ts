@@ -1,13 +1,10 @@
+import { and, count, eq, ne, or, sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { col, Op, where } from "sequelize";
+import { v4 as uuidv4 } from "uuid";
 
+import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
 import { eventhub } from "@web-speed-hackathon-2026/server/src/eventhub";
-import {
-  DirectMessage,
-  DirectMessageConversation,
-  User,
-} from "@web-speed-hackathon-2026/server/src/models";
 
 import type { NodeWebSocket } from "@hono/node-ws";
 import type { Context } from "hono";
@@ -16,62 +13,317 @@ import type { HonoEnv } from "../../types";
 
 type UpgradeWS = NodeWebSocket["upgradeWebSocket"];
 
+// Helper to format user for response
+function formatUser(user: {
+  id: string;
+  username: string;
+  name: string;
+  description: string;
+  password: string;
+  profileImageId: string;
+  createdAt: string;
+  profileImage: { id: string; alt: string } | null;
+}) {
+  const { profileImageId, password, ...userData } = user;
+  return {
+    ...userData,
+    profileImage: user.profileImage,
+  };
+}
+
+// Helper to format direct message for response
+function formatDirectMessage(message: {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+  sender: {
+    id: string;
+    username: string;
+    name: string;
+    description: string;
+    password: string;
+    profileImageId: string;
+    createdAt: string;
+    profileImage: { id: string; alt: string } | null;
+  };
+}) {
+  const { senderId, conversationId, sender, ...msgData } = message;
+  return {
+    ...msgData,
+    sender: formatUser(sender),
+  };
+}
+
+// Helper to format conversation for response
+function formatConversation(conv: {
+  id: string;
+  initiatorId: string;
+  memberId: string;
+  initiator: {
+    id: string;
+    username: string;
+    name: string;
+    description: string;
+    password: string;
+    profileImageId: string;
+    createdAt: string;
+    profileImage: { id: string; alt: string } | null;
+  };
+  member: {
+    id: string;
+    username: string;
+    name: string;
+    description: string;
+    password: string;
+    profileImageId: string;
+    createdAt: string;
+    profileImage: { id: string; alt: string } | null;
+  };
+  messages: Array<{
+    id: string;
+    conversationId: string;
+    senderId: string;
+    body: string;
+    isRead: boolean;
+    createdAt: string;
+    updatedAt: string;
+    sender: {
+      id: string;
+      username: string;
+      name: string;
+      description: string;
+      password: string;
+      profileImageId: string;
+      createdAt: string;
+      profileImage: { id: string; alt: string } | null;
+    };
+  }>;
+}) {
+  return {
+    id: conv.id,
+    initiator: formatUser(conv.initiator),
+    member: formatUser(conv.member),
+    messages: conv.messages.map(formatDirectMessage),
+  };
+}
+
+async function getUnreadCount(userId: string): Promise<number> {
+  const db = getDb();
+
+  // Get all conversation IDs where the user is a participant
+  const userConversations = await db.query.directMessageConversations.findMany({
+    where: or(
+      eq(schema.directMessageConversations.initiatorId, userId),
+      eq(schema.directMessageConversations.memberId, userId),
+    ),
+    columns: { id: true },
+  });
+
+  const conversationIds = userConversations.map((c) => c.id);
+
+  if (conversationIds.length === 0) return 0;
+
+  // Count unread messages not sent by the user in those conversations
+  const result = await db
+    .select({ count: count() })
+    .from(schema.directMessages)
+    .where(
+      and(
+        sql`${schema.directMessages.conversationId} IN (${sql.join(
+          conversationIds.map((id) => sql`${id}`),
+          sql`, `,
+        )})`,
+        ne(schema.directMessages.senderId, userId),
+        eq(schema.directMessages.isRead, false),
+      ),
+    );
+
+  return result[0]?.count ?? 0;
+}
+
+async function emitDmEvents(messageId: string) {
+  const db = getDb();
+
+  const directMessage = await db.query.directMessages.findFirst({
+    where: eq(schema.directMessages.id, messageId),
+    with: {
+      sender: {
+        with: {
+          profileImage: true,
+        },
+      },
+    },
+  });
+
+  if (!directMessage) return;
+
+  const conversation = await db.query.directMessageConversations.findFirst({
+    where: eq(schema.directMessageConversations.id, directMessage.conversationId),
+  });
+
+  if (!conversation) return;
+
+  const receiverId =
+    conversation.initiatorId === directMessage.senderId
+      ? conversation.memberId
+      : conversation.initiatorId;
+
+  const unreadCount = await getUnreadCount(receiverId);
+
+  eventhub.emit(`dm:conversation/${conversation.id}:message`, formatDirectMessage(directMessage));
+  eventhub.emit(`dm:unread/${receiverId}`, { unreadCount });
+}
+
 export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
   const router = new Hono<HonoEnv>();
 
   router.get("/dm", async (c) => {
+    const db = getDb();
     const userId = c.get("session").userId;
     if (userId === undefined) {
       throw new HTTPException(401);
     }
 
-    const conversations = await DirectMessageConversation.findAll({
-      where: {
-        [Op.and]: [
-          {
-            [Op.or]: [{ initiatorId: userId }, { memberId: userId }],
+    // Get conversations where user is participant and has messages
+    const conversations = await db.query.directMessageConversations.findMany({
+      where: or(
+        eq(schema.directMessageConversations.initiatorId, userId),
+        eq(schema.directMessageConversations.memberId, userId),
+      ),
+      with: {
+        initiator: {
+          with: {
+            profileImage: true,
           },
-          where(col("messages.id"), { [Op.not]: null }),
-        ],
+        },
+        member: {
+          with: {
+            profileImage: true,
+          },
+        },
+        messages: {
+          with: {
+            sender: {
+              with: {
+                profileImage: true,
+              },
+            },
+          },
+          orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+        },
       },
-      order: [[col("messages.createdAt"), "DESC"]],
     });
 
-    const sorted = conversations.map((conv) => ({
-      ...conv.toJSON(),
-      messages: conv.messages?.reverse(),
-    }));
+    // Filter to only conversations with messages and sort by latest message
+    const conversationsWithMessages = conversations
+      .filter((conv) => conv.messages.length > 0)
+      .sort((a, b) => {
+        const aLatest = a.messages[a.messages.length - 1]?.createdAt ?? "";
+        const bLatest = b.messages[b.messages.length - 1]?.createdAt ?? "";
+        return bLatest.localeCompare(aLatest);
+      });
 
-    return c.json(sorted);
+    const result = conversationsWithMessages.map(formatConversation);
+
+    return c.json(result);
   });
 
   router.post("/dm", async (c) => {
+    const db = getDb();
     const userId = c.get("session").userId;
     if (userId === undefined) {
       throw new HTTPException(401);
     }
 
     const body = await c.req.json();
-    const peer = await User.findByPk(body?.peerId);
-    if (peer === null) {
+    const peerId = body?.peerId;
+
+    const peer = await db.query.users.findFirst({
+      where: eq(schema.users.id, peerId),
+    });
+    if (!peer) {
       throw new HTTPException(404);
     }
 
-    const [conversation] = await DirectMessageConversation.findOrCreate({
-      where: {
-        [Op.or]: [
-          { initiatorId: userId, memberId: peer.id },
-          { initiatorId: peer.id, memberId: userId },
-        ],
-      },
-      defaults: {
-        initiatorId: userId,
-        memberId: peer.id,
+    // FindOrCreate semantics with conflict-safe logic
+    let conversation = await db.query.directMessageConversations.findFirst({
+      where: or(
+        and(
+          eq(schema.directMessageConversations.initiatorId, userId),
+          eq(schema.directMessageConversations.memberId, peerId),
+        ),
+        and(
+          eq(schema.directMessageConversations.initiatorId, peerId),
+          eq(schema.directMessageConversations.memberId, userId),
+        ),
+      ),
+      with: {
+        initiator: {
+          with: {
+            profileImage: true,
+          },
+        },
+        member: {
+          with: {
+            profileImage: true,
+          },
+        },
+        messages: {
+          with: {
+            sender: {
+              with: {
+                profileImage: true,
+              },
+            },
+          },
+          orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+        },
       },
     });
-    await conversation.reload();
 
-    return c.json(conversation);
+    if (!conversation) {
+      const conversationId = uuidv4();
+      await db.insert(schema.directMessageConversations).values({
+        id: conversationId,
+        initiatorId: userId,
+        memberId: peerId,
+      });
+
+      conversation = await db.query.directMessageConversations.findFirst({
+        where: eq(schema.directMessageConversations.id, conversationId),
+        with: {
+          initiator: {
+            with: {
+              profileImage: true,
+            },
+          },
+          member: {
+            with: {
+              profileImage: true,
+            },
+          },
+          messages: {
+            with: {
+              sender: {
+                with: {
+                  profileImage: true,
+                },
+              },
+            },
+            orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+          },
+        },
+      });
+    }
+
+    if (conversation === undefined) {
+      throw new HTTPException(500);
+    }
+    return c.json(formatConversation(conversation));
   });
 
   router.get(
@@ -96,22 +348,7 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
             eventhub.off(`dm:unread/${userId}`, handler);
           });
 
-          const unreadCount = await DirectMessage.count({
-            distinct: true,
-            where: {
-              senderId: { [Op.ne]: userId },
-              isRead: false,
-            },
-            include: [
-              {
-                association: "conversation",
-                where: {
-                  [Op.or]: [{ initiatorId: userId }, { memberId: userId }],
-                },
-                required: true,
-              },
-            ],
-          });
+          const unreadCount = await getUnreadCount(userId);
 
           eventhub.emit(`dm:unread/${userId}`, { unreadCount });
         },
@@ -120,22 +357,51 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
   );
 
   router.get("/dm/:conversationId", async (c) => {
+    const db = getDb();
     const userId = c.get("session").userId;
     if (userId === undefined) {
       throw new HTTPException(401);
     }
 
-    const conversation = await DirectMessageConversation.findOne({
-      where: {
-        id: c.req.param("conversationId"),
-        [Op.or]: [{ initiatorId: userId }, { memberId: userId }],
+    const conversationId = c.req.param("conversationId");
+
+    const conversation = await db.query.directMessageConversations.findFirst({
+      where: and(
+        eq(schema.directMessageConversations.id, conversationId),
+        or(
+          eq(schema.directMessageConversations.initiatorId, userId),
+          eq(schema.directMessageConversations.memberId, userId),
+        ),
+      ),
+      with: {
+        initiator: {
+          with: {
+            profileImage: true,
+          },
+        },
+        member: {
+          with: {
+            profileImage: true,
+          },
+        },
+        messages: {
+          with: {
+            sender: {
+              with: {
+                profileImage: true,
+              },
+            },
+          },
+          orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+        },
       },
     });
-    if (conversation === null) {
+
+    if (!conversation) {
       throw new HTTPException(404);
     }
 
-    return c.json(conversation);
+    return c.json(formatConversation(conversation));
   });
 
   router.get(
@@ -151,13 +417,18 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
             return;
           }
 
-          const conversation = await DirectMessageConversation.findOne({
-            where: {
-              id: conversationId,
-              [Op.or]: [{ initiatorId: userId }, { memberId: userId }],
-            },
+          const db = getDb();
+          const conversation = await db.query.directMessageConversations.findFirst({
+            where: and(
+              eq(schema.directMessageConversations.id, conversationId),
+              or(
+                eq(schema.directMessageConversations.initiatorId, userId),
+                eq(schema.directMessageConversations.memberId, userId),
+              ),
+            ),
           });
-          if (conversation == null) {
+
+          if (!conversation) {
             ws.close();
             return;
           }
@@ -193,6 +464,7 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
   );
 
   router.post("/dm/:conversationId/messages", async (c) => {
+    const db = getDb();
     const userId = c.get("session").userId;
     if (userId === undefined) {
       throw new HTTPException(401);
@@ -204,39 +476,75 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
       throw new HTTPException(400);
     }
 
-    const conversation = await DirectMessageConversation.findOne({
-      where: {
-        id: c.req.param("conversationId"),
-        [Op.or]: [{ initiatorId: userId }, { memberId: userId }],
-      },
+    const conversationId = c.req.param("conversationId");
+
+    const conversation = await db.query.directMessageConversations.findFirst({
+      where: and(
+        eq(schema.directMessageConversations.id, conversationId),
+        or(
+          eq(schema.directMessageConversations.initiatorId, userId),
+          eq(schema.directMessageConversations.memberId, userId),
+        ),
+      ),
     });
-    if (conversation === null) {
+
+    if (!conversation) {
       throw new HTTPException(404);
     }
 
-    const message = await DirectMessage.create({
+    const messageId = uuidv4();
+    const now = new Date().toISOString();
+
+    await db.insert(schema.directMessages).values({
+      id: messageId,
       body: bodyText.trim(),
       conversationId: conversation.id,
       senderId: userId,
+      isRead: false,
+      createdAt: now,
+      updatedAt: now,
     });
-    await message.reload();
 
-    return c.json(message, 201);
+    // Emit events after message creation (replaces Sequelize hook)
+    await emitDmEvents(messageId);
+
+    const message = await db.query.directMessages.findFirst({
+      where: eq(schema.directMessages.id, messageId),
+      with: {
+        sender: {
+          with: {
+            profileImage: true,
+          },
+        },
+      },
+    });
+
+    if (message === undefined) {
+      throw new HTTPException(500);
+    }
+    return c.json(formatDirectMessage(message), 201);
   });
 
   router.post("/dm/:conversationId/read", async (c) => {
+    const db = getDb();
     const userId = c.get("session").userId;
     if (userId === undefined) {
       throw new HTTPException(401);
     }
 
-    const conversation = await DirectMessageConversation.findOne({
-      where: {
-        id: c.req.param("conversationId"),
-        [Op.or]: [{ initiatorId: userId }, { memberId: userId }],
-      },
+    const conversationId = c.req.param("conversationId");
+
+    const conversation = await db.query.directMessageConversations.findFirst({
+      where: and(
+        eq(schema.directMessageConversations.id, conversationId),
+        or(
+          eq(schema.directMessageConversations.initiatorId, userId),
+          eq(schema.directMessageConversations.memberId, userId),
+        ),
+      ),
     });
-    if (conversation === null) {
+
+    if (!conversation) {
       throw new HTTPException(404);
     }
 
@@ -245,31 +553,50 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
         ? conversation.initiatorId
         : conversation.memberId;
 
-    await DirectMessage.update(
-      { isRead: true },
-      {
-        where: {
-          conversationId: conversation.id,
-          senderId: peerId,
-          isRead: false,
-        },
-        individualHooks: true,
-      },
-    );
+    // Get IDs of messages to update
+    const messagesToUpdate = await db.query.directMessages.findMany({
+      where: and(
+        eq(schema.directMessages.conversationId, conversation.id),
+        eq(schema.directMessages.senderId, peerId),
+        eq(schema.directMessages.isRead, false),
+      ),
+      columns: { id: true },
+    });
+
+    const now = new Date().toISOString();
+
+    // Update messages
+    await db
+      .update(schema.directMessages)
+      .set({ isRead: true, updatedAt: now })
+      .where(
+        and(
+          eq(schema.directMessages.conversationId, conversation.id),
+          eq(schema.directMessages.senderId, peerId),
+          eq(schema.directMessages.isRead, false),
+        ),
+      );
+
+    // Emit events for each updated message (replaces Sequelize individualHooks)
+    for (const msg of messagesToUpdate) {
+      await emitDmEvents(msg.id);
+    }
 
     return c.json({});
   });
 
   router.post("/dm/:conversationId/typing", async (c) => {
+    const db = getDb();
     const userId = c.get("session").userId;
     if (userId === undefined) {
       throw new HTTPException(401);
     }
 
-    const conversation = await DirectMessageConversation.findByPk(
-      c.req.param("conversationId"),
-    );
-    if (conversation === null) {
+    const conversation = await db.query.directMessageConversations.findFirst({
+      where: eq(schema.directMessageConversations.id, c.req.param("conversationId")),
+    });
+
+    if (!conversation) {
       throw new HTTPException(404);
     }
 

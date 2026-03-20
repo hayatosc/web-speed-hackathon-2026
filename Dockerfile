@@ -5,15 +5,14 @@ ARG PNPM_VERSION=10.32.1
 
 FROM node:${NODE_VERSION}-slim AS base
 
-LABEL fly_launch_runtime="Node.js"
-
 ENV PNPM_HOME=/pnpm
 
 WORKDIR /app
-RUN --mount=type=cache,target=/root/.apt apt-get update && apt-get install -y brotli && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=cache,target=/root/.npm npm install -g pnpm@${PNPM_VERSION}
 
 FROM base AS build
+
+RUN --mount=type=cache,target=/root/.apt apt-get update && apt-get install -y brotli python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 COPY ./application/package.json ./application/pnpm-lock.yaml ./application/pnpm-workspace.yaml ./
 COPY ./application/client/package.json ./client/package.json
@@ -26,11 +25,22 @@ RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm build
 
 RUN find /app/dist -type f \( -name "*.js" -o -name "*.css" \) -exec gzip -k {} \; -exec brotli -k {} \;
 
+# Prune to production deps only
 RUN --mount=type=cache,target=/pnpm/store CI=true pnpm install --frozen-lockfile --prod --filter @web-speed-hackathon-2026/server
 
-FROM base
+# Final image — only what's needed at runtime
+FROM node:${NODE_VERSION}-slim
 
-COPY --from=build /app /app
+LABEL fly_launch_runtime="Node.js"
+
+WORKDIR /app
+
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/server/node_modules ./server/node_modules
+COPY --from=build /app/server/dist ./server/dist
+COPY --from=build /app/server/database.sqlite ./server/database.sqlite
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/public ./public
 
 EXPOSE 8080
-CMD [ "pnpm", "start" ]
+CMD ["node", "server/dist/index.js"]

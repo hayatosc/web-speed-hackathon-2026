@@ -1,65 +1,76 @@
-import type { InferAttributes } from "sequelize";
+// Seed types for database insertion
+// These match the database column types (dates as ISO strings)
 
-import type { Comment } from "@web-speed-hackathon-2026/server/src/models/Comment";
-import type { DirectMessage } from "@web-speed-hackathon-2026/server/src/models/DirectMessage";
-import type { DirectMessageConversation } from "@web-speed-hackathon-2026/server/src/models/DirectMessageConversation";
-import type { Image } from "@web-speed-hackathon-2026/server/src/models/Image";
-import type { Movie } from "@web-speed-hackathon-2026/server/src/models/Movie";
-import type { Post } from "@web-speed-hackathon-2026/server/src/models/Post";
-import type { PostsImagesRelation } from "@web-speed-hackathon-2026/server/src/models/PostsImagesRelation";
-import type { ProfileImage } from "@web-speed-hackathon-2026/server/src/models/ProfileImage";
-import type { QaSuggestion } from "@web-speed-hackathon-2026/server/src/models/QaSuggestion";
-import type { Sound } from "@web-speed-hackathon-2026/server/src/models/Sound";
-import type { User } from "@web-speed-hackathon-2026/server/src/models/User";
+export interface ProfileImageSeed {
+  id: string;
+  alt: string;
+}
 
-type DateToString<T> = {
-  [K in keyof T]: T[K] extends Date
-    ? string
-    : T[K] extends Date | null
-      ? string | null
-      : T[K] extends Date | undefined
-        ? string | undefined
-        : T[K];
-};
+export interface UserSeed {
+  id: string;
+  username: string;
+  name: string;
+  description: string;
+  password: string;
+  profileImageId: string;
+  createdAt: string;
+}
 
-export type ProfileImageSeed = Pick<InferAttributes<ProfileImage>, "id" | "alt">;
+export interface ImageSeed {
+  id: string;
+  alt: string;
+  createdAt: string;
+}
 
-export type UserSeed = DateToString<
-  Pick<
-    InferAttributes<User>,
-    "id" | "username" | "name" | "description" | "password" | "profileImageId" | "createdAt"
-  >
->;
+export interface MovieSeed {
+  id: string;
+}
 
-export type ImageSeed = DateToString<Pick<InferAttributes<Image>, "id" | "alt" | "createdAt">>;
+export interface SoundSeed {
+  id: string;
+  title: string;
+  artist: string;
+}
 
-export type MovieSeed = Pick<InferAttributes<Movie>, "id">;
+export interface PostSeed {
+  id: string;
+  userId: string;
+  movieId?: string | null;
+  soundId?: string | null;
+  text: string;
+  createdAt: string;
+}
 
-export type SoundSeed = Pick<InferAttributes<Sound>, "id" | "title" | "artist">;
+export interface PostsImagesRelationSeed {
+  postId: string;
+  imageId: string;
+}
 
-export type PostSeed = DateToString<
-  Pick<InferAttributes<Post>, "id" | "userId" | "movieId" | "soundId" | "text" | "createdAt">
->;
+export interface CommentSeed {
+  id: string;
+  userId: string;
+  postId: string;
+  text: string;
+  createdAt: string;
+}
 
-export type PostsImagesRelationSeed = Pick<
-  InferAttributes<PostsImagesRelation>,
-  "postId" | "imageId"
->;
+export interface DirectMessageConversationSeed {
+  id: string;
+  initiatorId: string;
+  memberId: string;
+}
 
-export type CommentSeed = DateToString<
-  Pick<InferAttributes<Comment>, "id" | "userId" | "postId" | "text" | "createdAt">
->;
+export interface DirectMessageSeed {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  body: string;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
 
-export type DirectMessageConversationSeed = Pick<
-  InferAttributes<DirectMessageConversation>,
-  "id" | "initiatorId" | "memberId"
->;
-
-export type DirectMessageSeed = DateToString<
-  Pick<
-    InferAttributes<DirectMessage>,
-    "id" | "conversationId" | "senderId" | "body" | "isRead" | "createdAt" | "updatedAt"
-  >
->;
-
-export type QaSuggestionSeed = Pick<InferAttributes<QaSuggestion>, "id" | "question">;
+export interface QaSuggestionSeed {
+  id: string;
+  question: string;
+}

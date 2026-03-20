@@ -1,46 +1,107 @@
+import bcrypt from "bcrypt";
+import { eq } from "drizzle-orm";
 import { Hono } from "hono";
-import { UniqueConstraintError, ValidationError } from "sequelize";
+import { v4 as uuidv4 } from "uuid";
 
-import { User } from "@web-speed-hackathon-2026/server/src/models";
+import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
 
 import type { HonoEnv } from "../../types";
 
 const router = new Hono<HonoEnv>();
 
-router.post("/signup", async (c) => {
-  try {
-    const body = await c.req.json();
-    const { id: userId } = await User.create(body);
-    const user = await User.findByPk(userId);
+// Username validation regex
+const USERNAME_REGEX = /^[a-z0-9_-]+$/i;
 
-    c.get("session").userId = userId;
-    return c.json(user);
-  } catch (err) {
-    if (err instanceof UniqueConstraintError) {
-      return c.json({ code: "USERNAME_TAKEN" }, 400);
-    }
-    if (err instanceof ValidationError) {
-      return c.json({ code: "INVALID_USERNAME" }, 400);
-    }
-    throw err;
+function hashPassword(password: string): string {
+  return bcrypt.hashSync(password, bcrypt.genSaltSync(8));
+}
+
+function verifyPassword(password: string, hash: string): boolean {
+  return bcrypt.compareSync(password, hash);
+}
+
+// Helper to format user response with profileImage (matching Sequelize's defaultScope)
+async function getUserWithProfileImage(userId: string) {
+  const db = getDb();
+  const result = await db.query.users.findFirst({
+    where: eq(schema.users.id, userId),
+    with: {
+      profileImage: true,
+    },
+  });
+
+  if (!result) return null;
+
+  // Format response to match Sequelize output (exclude profileImageId, password never returned)
+  const { profileImageId, password, ...userData } = result;
+  return {
+    ...userData,
+    profileImage: result.profileImage,
+  };
+}
+
+router.post("/signup", async (c) => {
+  const db = getDb();
+  const body = await c.req.json();
+
+  // Validate username format
+  if (typeof body.username !== "string" || !USERNAME_REGEX.test(body.username)) {
+    return c.json({ code: "INVALID_USERNAME" }, 400);
   }
+
+  // Check if username already exists
+  const existing = await db.query.users.findFirst({
+    where: eq(schema.users.username, body.username),
+  });
+
+  if (existing) {
+    return c.json({ code: "USERNAME_TAKEN" }, 400);
+  }
+
+  const userId = uuidv4();
+  const now = new Date().toISOString();
+
+  await db.insert(schema.users).values({
+    id: userId,
+    username: body.username,
+    name: body.name ?? "",
+    description: body.description ?? "",
+    password: hashPassword(body.password),
+    profileImageId: body.profileImageId ?? "396fe4ce-aa36-4d96-b54e-6db40bae2eed",
+    createdAt: now,
+  });
+
+  const user = await getUserWithProfileImage(userId);
+  c.get("session").userId = userId;
+  return c.json(user);
 });
 
 router.post("/signin", async (c) => {
+  const db = getDb();
   const body = await c.req.json();
-  const user = await User.findOne({
-    where: { username: body.username },
+
+  const user = await db.query.users.findFirst({
+    where: eq(schema.users.username, body.username),
+    with: {
+      profileImage: true,
+    },
   });
 
-  if (user === null) {
+  if (user === undefined) {
     return c.json({ message: "Bad Request" }, 400);
   }
-  if (!user.validPassword(body.password)) {
+  if (!verifyPassword(body.password, user.password)) {
     return c.json({ message: "Bad Request" }, 400);
   }
 
   c.get("session").userId = user.id;
-  return c.json(user);
+
+  // Format response to match Sequelize output
+  const { profileImageId, password, ...userData } = user;
+  return c.json({
+    ...userData,
+    profileImage: user.profileImage,
+  });
 });
 
 router.post("/signout", async (c) => {

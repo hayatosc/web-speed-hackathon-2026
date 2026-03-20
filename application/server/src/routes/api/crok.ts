@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";
 
-import { QaSuggestion } from "@web-speed-hackathon-2026/server/src/models";
+import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
 
 import type { HonoEnv } from "../../types";
 
@@ -17,7 +17,8 @@ function sleep(ms: number): Promise<void> {
 }
 
 router.get("/crok/suggestions", async (c) => {
-  const suggestions = await QaSuggestion.findAll({ logging: false });
+  const db = getDb();
+  const suggestions = await db.select().from(schema.qaSuggestions);
   return c.json({ suggestions: suggestions.map((s) => s.question) });
 });
 

@@ -1,6 +1,5 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
-import { ValidationError } from "sequelize";
 
 import { authRouter } from "@web-speed-hackathon-2026/server/src/routes/api/auth";
 import { crokRouter } from "@web-speed-hackathon-2026/server/src/routes/api/crok";
@@ -15,6 +14,14 @@ import { userRouter } from "@web-speed-hackathon-2026/server/src/routes/api/user
 
 import type { NodeWebSocket } from "@hono/node-ws";
 import type { HonoEnv } from "../types";
+
+// Custom validation error class for explicit error handling
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
 
 export function createApiRouter(upgradeWebSocket: NodeWebSocket["upgradeWebSocket"]) {
   const router = new Hono<HonoEnv>();
