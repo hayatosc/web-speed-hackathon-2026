@@ -157,8 +157,53 @@ jobs:
                     echo "Preview image already deleted or unavailable"
                   fi
 
-    vrt:
+    e2e:
         needs: deploy_preview
+        if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: write
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  version: "2025.12.0"
+                  cache: true
+
+            - name: Run E2E
+              id: e2e
+              run: |
+                  node --experimental-strip-types scripts/run-e2e.ts "${{ needs.deploy_preview.outputs.url }}" 2>&1 | tee /tmp/e2e-result.txt
+                  echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+              continue-on-error: true
+
+            - name: Post E2E result comment
+              if: always()
+              run: |
+                  if [ "${{ steps.e2e.outputs.exit_code }}" = "0" ]; then
+                    ICON="✅"; LABEL="PASS"
+                  else
+                    ICON="❌"; LABEL="FAIL"
+                  fi
+                  gh pr comment ${{ github.event.number }} \
+                    --body "${ICON} **E2E: ${LABEL}**" \
+                    --repo ${{ github.repository }}
+              env:
+                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+            - name: Upload E2E Playwright report on failure
+              if: steps.e2e.outputs.exit_code != '0'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-e2e-report-pr-${{ github.event.number }}
+                  path: application/e2e/playwright-report/
+                  retention-days: 7
+
+    vrt:
+        needs: [deploy_preview, e2e]
         if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
         runs-on: ubuntu-latest
         permissions:
@@ -223,51 +268,6 @@ jobs:
               uses: actions/upload-artifact@v4
               with:
                   name: playwright-report-pr-${{ github.event.number }}
-                  path: application/e2e/playwright-report/
-                  retention-days: 7
-
-    e2e:
-        needs: deploy_preview
-        if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-            pull-requests: write
-        steps:
-            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-
-            - name: Setup mise
-              uses: jdx/mise-action@v2
-              with:
-                  version: "2025.12.0"
-                  cache: true
-
-            - name: Run E2E
-              id: e2e
-              run: |
-                  node --experimental-strip-types scripts/run-e2e.ts "${{ needs.deploy_preview.outputs.url }}" 2>&1 | tee /tmp/e2e-result.txt
-                  echo "exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
-              continue-on-error: true
-
-            - name: Post E2E result comment
-              if: always()
-              run: |
-                  if [ "${{ steps.e2e.outputs.exit_code }}" = "0" ]; then
-                    ICON="✅"; LABEL="PASS"
-                  else
-                    ICON="❌"; LABEL="FAIL"
-                  fi
-                  gh pr comment ${{ github.event.number }} \
-                    --body "${ICON} **E2E: ${LABEL}**" \
-                    --repo ${{ github.repository }}
-              env:
-                  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-            - name: Upload E2E Playwright report on failure
-              if: steps.e2e.outputs.exit_code != '0'
-              uses: actions/upload-artifact@v4
-              with:
-                  name: playwright-e2e-report-pr-${{ github.event.number }}
                   path: application/e2e/playwright-report/
                   retention-days: 7
 

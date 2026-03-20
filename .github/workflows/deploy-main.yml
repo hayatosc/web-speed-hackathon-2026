@@ -75,50 +75,6 @@ jobs:
                   echo "url=${URL}" >> "$GITHUB_OUTPUT"
                   echo "Production URL: ${URL}"
 
-    update_baseline:
-        needs: deploy
-        if: always() && ((github.event_name == 'push' && needs.deploy.result == 'success') || github.event_name == 'workflow_dispatch')
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-        steps:
-            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-              with:
-                  ref: ${{ github.sha }}
-
-            - name: Resolve production URL
-              id: resolve_url
-              run: |
-                  INPUT_URL="${{ github.event.inputs.app_url }}"
-                  DEPLOY_URL="${{ needs.deploy.outputs.url }}"
-                  if [ -n "$INPUT_URL" ]; then
-                    echo "url=$INPUT_URL" >> "$GITHUB_OUTPUT"
-                  elif [ -n "$DEPLOY_URL" ]; then
-                    echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
-                  elif [ -n "${{ vars.PRODUCTION_URL }}" ]; then
-                    echo "url=${{ vars.PRODUCTION_URL }}" >> "$GITHUB_OUTPUT"
-                  else
-                    echo "::error::PRODUCTION_URL が設定されていません。workflow_dispatch の app_url に指定するか、リポジトリ変数 PRODUCTION_URL を設定してください。"
-                    exit 1
-                  fi
-
-            - name: Setup mise
-              uses: jdx/mise-action@v2
-              with:
-                  version: "2025.12.0"
-                  cache: true
-
-            - name: Generate VRT baseline
-              run: node --experimental-strip-types scripts/update-vrt-baseline.ts "${{ steps.resolve_url.outputs.url }}"
-
-            - name: Upload baseline as artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: vrt-baseline
-                  path: application/e2e/src/**/*-snapshots/
-                  retention-days: 90
-                  overwrite: true
-
     e2e:
         needs: deploy
         if: always() && ((github.event_name == 'push' && needs.deploy.result == 'success') || github.event_name == 'workflow_dispatch')
@@ -162,3 +118,66 @@ jobs:
                   name: playwright-e2e-report-main
                   path: application/e2e/playwright-report/
                   retention-days: 7
+
+    update_baseline:
+        needs: [deploy, e2e]
+        if: |
+            always() && (
+              (github.event_name == 'push' && needs.deploy.result == 'success' && needs.e2e.result == 'success') ||
+              (github.event_name == 'workflow_dispatch' && needs.e2e.result == 'success')
+            )
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+              with:
+                  ref: ${{ github.sha }}
+
+            - name: Resolve production URL
+              id: resolve_url
+              run: |
+                  INPUT_URL="${{ github.event.inputs.app_url }}"
+                  DEPLOY_URL="${{ needs.deploy.outputs.url }}"
+                  if [ -n "$INPUT_URL" ]; then
+                    echo "url=$INPUT_URL" >> "$GITHUB_OUTPUT"
+                  elif [ -n "$DEPLOY_URL" ]; then
+                    echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+                  elif [ -n "${{ vars.PRODUCTION_URL }}" ]; then
+                    echo "url=${{ vars.PRODUCTION_URL }}" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "::error::PRODUCTION_URL が設定されていません。workflow_dispatch の app_url に指定するか、リポジトリ変数 PRODUCTION_URL を設定してください。"
+                    exit 1
+                  fi
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  version: "2025.12.0"
+                  cache: true
+
+            - name: Generate VRT baseline
+              id: generate_vrt_baseline
+              run: node --experimental-strip-types scripts/update-vrt-baseline.ts "${{ steps.resolve_url.outputs.url }}"
+              continue-on-error: true
+
+            - name: Upload baseline as artifact
+              if: steps.generate_vrt_baseline.outcome == 'success'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: vrt-baseline
+                  path: application/e2e/src/**/*-snapshots/
+                  retention-days: 90
+                  overwrite: true
+
+            - name: Upload VRT Playwright report on failure
+              if: steps.generate_vrt_baseline.outcome != 'success'
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-vrt-report-main
+                  path: application/e2e/playwright-report/
+                  retention-days: 7
+
+            - name: Fail if VRT baseline generation failed
+              if: steps.generate_vrt_baseline.outcome != 'success'
+              run: exit 1
