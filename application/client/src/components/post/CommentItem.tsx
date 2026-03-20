@@ -2,6 +2,7 @@ import moment from "moment";
 
 import { Link } from "@web-speed-hackathon-2026/client/src/components/foundation/Link";
 import { TranslatableText } from "@web-speed-hackathon-2026/client/src/components/post/TranslatableText";
+import { formatLongDate } from "@web-speed-hackathon-2026/client/src/utils/format_long_date";
 import { getProfileImagePath } from "@web-speed-hackathon-2026/client/src/utils/get_path";
 
 interface Props {
@@ -19,7 +20,9 @@ export const CommentItem = ({ comment }: Props) => {
           >
             <img
               alt={comment.user.profileImage.alt}
+              height={32}
               src={getProfileImagePath(comment.user.profileImage.id)}
+              width={32}
             />
           </Link>
         </div>
@@ -43,7 +46,7 @@ export const CommentItem = ({ comment }: Props) => {
           </div>
           <p className="text-cax-text-muted pt-1 text-xs">
             <time dateTime={moment(comment.createdAt).toISOString()}>
-              {moment(comment.createdAt).locale("ja").format("LL")}
+              {formatLongDate(comment.createdAt)}
             </time>
           </p>
         </div>

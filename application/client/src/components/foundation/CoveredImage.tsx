@@ -1,3 +1,4 @@
+import { Buffer } from "buffer";
 import { load, ImageIFD } from "piexifjs";
 import { MouseEvent, useCallback, useId, useState } from "react";
 

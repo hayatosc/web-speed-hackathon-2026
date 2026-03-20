@@ -1,58 +1,55 @@
-import $ from "jquery";
-import { gzip } from "pako";
+export class HttpError extends Error {
+  readonly responseJSON: unknown;
 
-export async function fetchBinary(url: string): Promise<ArrayBuffer> {
-  const result = await $.ajax({
-    async: false,
-    dataType: "binary",
-    method: "GET",
-    responseType: "arraybuffer",
-    url,
-  });
-  return result;
+  constructor(status: number, responseJSON: unknown, url: string) {
+    super(`HTTP ${status} from ${url}`);
+    this.responseJSON = responseJSON;
+  }
 }
 
-export async function fetchJSON<T>(url: string): Promise<T> {
-  const result = await $.ajax({
-    async: false,
-    dataType: "json",
-    method: "GET",
-    url,
-  });
-  return result;
+async function throwIfNotOk(res: Response, url: string): Promise<void> {
+  if (res.ok) return;
+  let body: unknown = null;
+  try {
+    body = await res.json();
+  } catch {
+    // response body が JSON でない場合は null のまま
+  }
+  throw new HttpError(res.status, body, url);
+}
+
+export async function fetchBinary(url: string, signal?: AbortSignal): Promise<ArrayBuffer> {
+  const res = await fetch(url, { signal });
+  await throwIfNotOk(res, url);
+  return res.arrayBuffer();
+}
+
+export async function fetchJSON<T>(url: string, signal?: AbortSignal): Promise<T> {
+  const res = await fetch(url, { signal });
+  await throwIfNotOk(res, url);
+  return res.json() as Promise<T>;
 }
 
 export async function sendFile<T>(url: string, file: File): Promise<T> {
-  const result = await $.ajax({
-    async: false,
-    data: file,
-    dataType: "json",
+  const res = await fetch(url, {
+    method: "POST",
     headers: {
       "Content-Type": "application/octet-stream",
     },
-    method: "POST",
-    processData: false,
-    url,
+    body: file,
   });
-  return result;
+  await throwIfNotOk(res, url);
+  return res.json() as Promise<T>;
 }
 
 export async function sendJSON<T>(url: string, data: object): Promise<T> {
-  const jsonString = JSON.stringify(data);
-  const uint8Array = new TextEncoder().encode(jsonString);
-  const compressed = gzip(uint8Array);
-
-  const result = await $.ajax({
-    async: false,
-    data: compressed,
-    dataType: "json",
+  const res = await fetch(url, {
+    method: "POST",
     headers: {
-      "Content-Encoding": "gzip",
       "Content-Type": "application/json",
     },
-    method: "POST",
-    processData: false,
-    url,
+    body: JSON.stringify(data),
   });
-  return result;
+  await throwIfNotOk(res, url);
+  return res.json() as Promise<T>;
 }

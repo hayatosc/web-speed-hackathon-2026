@@ -75,56 +75,12 @@ jobs:
                   echo "url=${URL}" >> "$GITHUB_OUTPUT"
                   echo "Production URL: ${URL}"
 
-    e2e:
+    vrt:
         needs: deploy
-        if: always() && ((github.event_name == 'push' && needs.deploy.result == 'success') || github.event_name == 'workflow_dispatch')
-        runs-on: ubuntu-latest
-        permissions:
-            contents: read
-        steps:
-            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
-              with:
-                  ref: ${{ github.sha }}
-
-            - name: Resolve production URL
-              id: resolve_url
-              run: |
-                  INPUT_URL="${{ github.event.inputs.app_url }}"
-                  DEPLOY_URL="${{ needs.deploy.outputs.url }}"
-                  if [ -n "$INPUT_URL" ]; then
-                    echo "url=$INPUT_URL" >> "$GITHUB_OUTPUT"
-                  elif [ -n "$DEPLOY_URL" ]; then
-                    echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
-                  elif [ -n "${{ vars.PRODUCTION_URL }}" ]; then
-                    echo "url=${{ vars.PRODUCTION_URL }}" >> "$GITHUB_OUTPUT"
-                  else
-                    echo "::error::PRODUCTION_URL が設定されていません。workflow_dispatch の app_url に指定するか、リポジトリ変数 PRODUCTION_URL を設定してください。"
-                    exit 1
-                  fi
-
-            - name: Setup mise
-              uses: jdx/mise-action@v2
-              with:
-                  version: "2025.12.0"
-                  cache: true
-
-            - name: Run E2E
-              run: node --experimental-strip-types scripts/run-e2e.ts "${{ steps.resolve_url.outputs.url }}"
-
-            - name: Upload E2E Playwright report on failure
-              if: failure()
-              uses: actions/upload-artifact@v4
-              with:
-                  name: playwright-e2e-report-main
-                  path: application/e2e/playwright-report/
-                  retention-days: 7
-
-    update_baseline:
-        needs: [deploy, e2e]
         if: |
             always() && (
-              (github.event_name == 'push' && needs.deploy.result == 'success' && needs.e2e.result == 'success') ||
-              (github.event_name == 'workflow_dispatch' && needs.e2e.result == 'success')
+              (github.event_name == 'push' && needs.deploy.result == 'success') ||
+              (github.event_name == 'workflow_dispatch')
             )
         runs-on: ubuntu-latest
         permissions:
@@ -181,3 +137,47 @@ jobs:
             - name: Fail if VRT baseline generation failed
               if: steps.generate_vrt_baseline.outcome != 'success'
               run: exit 1
+
+    e2e:
+        needs: [deploy, vrt]
+        if: always() && ((github.event_name == 'push' && needs.deploy.result == 'success' && needs.vrt.result == 'success') || github.event_name == 'workflow_dispatch')
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        steps:
+            - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+              with:
+                  ref: ${{ github.sha }}
+
+            - name: Resolve production URL
+              id: resolve_url
+              run: |
+                  INPUT_URL="${{ github.event.inputs.app_url }}"
+                  DEPLOY_URL="${{ needs.deploy.outputs.url }}"
+                  if [ -n "$INPUT_URL" ]; then
+                    echo "url=$INPUT_URL" >> "$GITHUB_OUTPUT"
+                  elif [ -n "$DEPLOY_URL" ]; then
+                    echo "url=$DEPLOY_URL" >> "$GITHUB_OUTPUT"
+                  elif [ -n "${{ vars.PRODUCTION_URL }}" ]; then
+                    echo "url=${{ vars.PRODUCTION_URL }}" >> "$GITHUB_OUTPUT"
+                  else
+                    echo "::error::PRODUCTION_URL が設定されていません。workflow_dispatch の app_url に指定するか、リポジトリ変数 PRODUCTION_URL を設定してください。"
+                    exit 1
+                  fi
+
+            - name: Setup mise
+              uses: jdx/mise-action@v2
+              with:
+                  version: "2025.12.0"
+                  cache: true
+
+            - name: Run E2E
+              run: node --experimental-strip-types scripts/run-e2e.ts "${{ steps.resolve_url.outputs.url }}"
+
+            - name: Upload E2E Playwright report on failure
+              if: failure()
+              uses: actions/upload-artifact@v4
+              with:
+                  name: playwright-e2e-report-main
+                  path: application/e2e/playwright-report/
+                  retention-days: 7

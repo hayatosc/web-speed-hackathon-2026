@@ -1,7 +1,5 @@
 import { useCallback, useState } from "react";
 
-import { createTranslator } from "@web-speed-hackathon-2026/client/src/utils/create_translator";
-
 type State =
   | { type: "idle"; text: string }
   | { type: "loading" }
@@ -11,15 +9,18 @@ interface Props {
   text: string;
 }
 
+const loadTranslator = () => import("@web-speed-hackathon-2026/client/src/utils/create_translator");
+
 export const TranslatableText = ({ text }: Props) => {
   const [state, updateState] = useState<State>({ type: "idle", text });
 
   const handleClick = useCallback(() => {
     switch (state.type) {
       case "idle": {
-        (async () => {
+        void (async () => {
           updateState({ type: "loading" });
           try {
+            const { createTranslator } = await loadTranslator();
             using translator = await createTranslator({
               sourceLanguage: "ja",
               targetLanguage: "en",
@@ -65,9 +66,10 @@ export const TranslatableText = ({ text }: Props) => {
       <p>
         <button
           className="text-cax-accent disabled:text-cax-text-subtle hover:underline disabled:cursor-default"
-          type="button"
           disabled={state.type === "loading"}
+          data-prevent-post-navigation="true"
           onClick={handleClick}
+          type="button"
         >
           {state.type === "idle" ? <span>Show Translation</span> : null}
           {state.type === "loading" ? <span>Translating...</span> : null}
