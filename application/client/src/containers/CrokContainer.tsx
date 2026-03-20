@@ -10,8 +10,10 @@ type Props = {
   authModalId: string;
 };
 
+type ChatMessageWithId = Models.ChatMessage & { id: string };
+
 export const CrokContainer = ({ activeUser, authModalId }: Props) => {
-  const [messages, setMessages] = useState<Models.ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessageWithId[]>([]);
 
   const sseOptions = useMemo(
     () => ({
@@ -42,7 +44,7 @@ export const CrokContainer = ({ activeUser, authModalId }: Props) => {
       if (lastMessage?.role === "assistant") {
         return [
           ...messages.slice(0, -1),
-          { role: "assistant" as const, content: currentAssistantContent },
+          { ...lastMessage, content: currentAssistantContent },
         ];
       }
     }
@@ -53,11 +55,13 @@ export const CrokContainer = ({ activeUser, authModalId }: Props) => {
     (userInput: string) => {
       if (!userInput.trim() || isStreaming) return;
 
-      const userMessage: Models.ChatMessage = {
+      const userMessage: ChatMessageWithId = {
+        id: crypto.randomUUID(),
         role: "user",
         content: userInput,
       };
-      const assistantMessage: Models.ChatMessage = {
+      const assistantMessage: ChatMessageWithId = {
+        id: crypto.randomUUID(),
         role: "assistant",
         content: "",
       };

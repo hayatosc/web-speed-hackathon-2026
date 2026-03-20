@@ -1,5 +1,5 @@
 import moment from "moment";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Button } from "@web-speed-hackathon-2026/client/src/components/foundation/Button";
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/src/components/foundation/FontAwesomeIcon";
@@ -41,6 +41,21 @@ export const DirectMessageListPage = ({ activeUser, newDmModalId }: Props) => {
     void loadConversations();
   });
 
+  const unreadByConversationId = useMemo(() => {
+    return new Map(
+      (conversations ?? []).map((conversation) => {
+        const peerId =
+          conversation.initiator.id !== activeUser.id
+            ? conversation.initiator.id
+            : conversation.member.id;
+        const hasUnread = conversation.messages.some(
+          (message) => message.sender.id === peerId && !message.isRead,
+        );
+        return [conversation.id, hasUnread];
+      }),
+    );
+  }, [activeUser.id, conversations]);
+
   if (conversations == null) {
     return null;
   }
@@ -76,9 +91,7 @@ export const DirectMessageListPage = ({ activeUser, newDmModalId }: Props) => {
                 : conversation.member;
 
             const lastMessage = messages.at(-1);
-            const hasUnread = messages
-              .filter((m) => m.sender.id === peer.id)
-              .some((m) => !m.isRead);
+            const hasUnread = unreadByConversationId.get(conversation.id) ?? false;
 
             return (
               <li className="grid" key={conversation.id}>
@@ -87,7 +100,9 @@ export const DirectMessageListPage = ({ activeUser, newDmModalId }: Props) => {
                     <img
                       alt={peer.profileImage.alt}
                       className="w-12 shrink-0 self-start rounded-full"
+                      height={48}
                       src={getProfileImagePath(peer.profileImage.id)}
+                      width={48}
                     />
                     <div className="flex flex-1 flex-col">
                       <div className="flex items-center justify-between">
