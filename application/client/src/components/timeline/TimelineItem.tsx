@@ -1,5 +1,5 @@
 import moment from "moment";
-import { MouseEventHandler, useCallback, useEffect } from "react";
+import { MouseEventHandler, useCallback } from "react";
 import { Link, useNavigate } from "react-router";
 
 import { ImageArea } from "@web-speed-hackathon-2026/client/src/components/post/ImageArea";
@@ -33,10 +33,6 @@ interface Props {
 
 export const TimelineItem = ({ post }: Props) => {
   const navigate = useNavigate();
-
-  useEffect(() => {
-    void import("@web-speed-hackathon-2026/client/src/containers/PostContainer");
-  }, []);
 
   /**
    * ボタンやリンク以外の箇所をクリックしたとき かつ 文字が選択されてないとき、投稿詳細ページに遷移する
