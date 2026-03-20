@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 import { login, scrollEntire } from "./utils";
 
+const PEER_BASE_URL = process.env["E2E_BASE_URL"] ?? "http://localhost:3000";
+
 test.describe("DM一覧", () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
@@ -103,6 +105,18 @@ test.describe("DM一覧", () => {
     await expect(page.getByRole("heading", { name: "滝沢 裕美" })).toBeVisible({
       timeout: 10 * 1000,
     });
+    await expect
+      .poll(async () => {
+        return await page.evaluate(() => {
+          const messageList = document.querySelector<HTMLElement>('[data-testid="dm-message-list"]');
+          const container = messageList?.parentElement;
+          if (container == null) {
+            return false;
+          }
+          return container.scrollHeight - container.clientHeight - container.scrollTop <= 4;
+        });
+      })
+      .toBe(true);
 
     // VRT: DM詳細
     await expect(page).toHaveScreenshot("dm-DM詳細.png");
@@ -159,7 +173,7 @@ test.describe("DM一覧", () => {
     await page.getByRole("link", { name: "g16hmw55" }).click();
     await page.waitForURL("**/dm/*", { timeout: 10 * 1000 });
 
-    const peerContext = await browser.newContext();
+    const peerContext = await browser.newContext({ baseURL: PEER_BASE_URL });
     const peerPage = await peerContext.newPage();
     await login(peerPage, "g16hmw55");
     await peerPage.goto("/dm");
@@ -182,7 +196,7 @@ test.describe("DM一覧", () => {
     await page.getByRole("link", { name: "jirgqx22" }).click();
     await page.waitForURL("**/dm/*", { timeout: 10 * 1000 });
 
-    const peerContext = await browser.newContext();
+    const peerContext = await browser.newContext({ baseURL: PEER_BASE_URL });
     const peerPage = await peerContext.newPage();
     await login(peerPage, "jirgqx22");
     await peerPage.goto("/dm");

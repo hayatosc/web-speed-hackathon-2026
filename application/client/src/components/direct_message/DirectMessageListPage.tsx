@@ -1,5 +1,5 @@
 import moment from "moment";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@web-speed-hackathon-2026/client/src/components/foundation/Button";
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/src/components/foundation/FontAwesomeIcon";
@@ -15,7 +15,7 @@ interface Props {
 
 export const DirectMessageListPage = ({ activeUser, newDmModalId }: Props) => {
   const [conversations, setConversations] =
-    useState<Array<Models.DirectMessageConversation> | null>(null);
+    useState<Array<Models.DirectMessageConversationSummary> | null>(null);
   const [error, setError] = useState<Error | null>(null);
 
   const loadConversations = useCallback(async () => {
@@ -24,7 +24,9 @@ export const DirectMessageListPage = ({ activeUser, newDmModalId }: Props) => {
     }
 
     try {
-      const conversations = await fetchJSON<Array<Models.DirectMessageConversation>>("/api/v1/dm");
+      const conversations = await fetchJSON<Array<Models.DirectMessageConversationSummary>>(
+        "/api/v1/dm",
+      );
       setConversations(conversations);
       setError(null);
     } catch (error) {
@@ -40,21 +42,6 @@ export const DirectMessageListPage = ({ activeUser, newDmModalId }: Props) => {
   useWs("/api/v1/dm/unread", () => {
     void loadConversations();
   });
-
-  const unreadByConversationId = useMemo(() => {
-    return new Map(
-      (conversations ?? []).map((conversation) => {
-        const peerId =
-          conversation.initiator.id !== activeUser.id
-            ? conversation.initiator.id
-            : conversation.member.id;
-        const hasUnread = conversation.messages.some(
-          (message) => message.sender.id === peerId && !message.isRead,
-        );
-        return [conversation.id, hasUnread];
-      }),
-    );
-  }, [activeUser.id, conversations]);
 
   if (conversations == null) {
     return null;
@@ -84,14 +71,11 @@ export const DirectMessageListPage = ({ activeUser, newDmModalId }: Props) => {
       ) : (
         <ul data-testid="dm-list">
           {conversations.map((conversation) => {
-            const { messages } = conversation;
             const peer =
               conversation.initiator.id !== activeUser.id
                 ? conversation.initiator
                 : conversation.member;
-
-            const lastMessage = messages.at(-1);
-            const hasUnread = unreadByConversationId.get(conversation.id) ?? false;
+            const { hasUnread, lastMessage } = conversation;
 
             return (
               <li className="grid" key={conversation.id}>

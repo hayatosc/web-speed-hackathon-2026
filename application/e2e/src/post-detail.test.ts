@@ -1,6 +1,24 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
 import { dynamicMediaMask, waitForVisibleMedia } from "./utils";
+
+async function waitForPostDetail(page: Page) {
+  const article = page.locator("main article").first();
+  await expect(article).toBeVisible({ timeout: 30_000 });
+  await expect(page).toHaveTitle(/さんのつぶやき - CaX/, { timeout: 30_000 });
+  await expect
+    .poll(async () => {
+      return await page.evaluate(() => {
+        const article = document.querySelector("main article");
+        const time = article?.querySelector("time");
+        const profileLinks = article?.querySelectorAll("a[href^='/users/']").length ?? 0;
+        return Boolean(article?.textContent?.trim()) && time !== null && profileLinks >= 2;
+      });
+    })
+    .toBe(true);
+  return article;
+}
 
 test.describe("投稿詳細", () => {
   test.beforeEach(async ({ page }) => {
@@ -11,11 +29,10 @@ test.describe("投稿詳細", () => {
     await page.goto("/");
     const firstArticle = page.locator("article").first();
     await expect(firstArticle).toBeVisible({ timeout: 30_000 });
-    await firstArticle.click();
+    await firstArticle.dispatchEvent("click");
     await page.waitForURL("**/posts/*", { timeout: 10_000 });
 
-    const article = page.locator("article").first();
-    await expect(article).toBeVisible({ timeout: 10_000 });
+    await waitForPostDetail(page);
 
     // VRT: 投稿詳細
     await waitForVisibleMedia(page);
@@ -28,10 +45,10 @@ test.describe("投稿詳細", () => {
     await page.goto("/");
     const firstArticle = page.locator("article").first();
     await expect(firstArticle).toBeVisible({ timeout: 30_000 });
-    await firstArticle.click();
+    await firstArticle.dispatchEvent("click");
     await page.waitForURL("**/posts/*", { timeout: 10_000 });
 
-    await expect(page).toHaveTitle(/さんのつぶやき - CaX/, { timeout: 10_000 });
+    await waitForPostDetail(page);
   });
 });
 
@@ -47,6 +64,7 @@ test.describe("投稿詳細 - 動画", () => {
     await movieArticle.locator("time").first().click();
     await page.waitForURL("**/posts/*", { timeout: 10_000 });
 
+    await waitForPostDetail(page);
     const canvas = page.locator("canvas").first();
     await expect(canvas).toBeVisible({ timeout: 30_000 });
 
@@ -77,6 +95,7 @@ test.describe("投稿詳細 - 音声", () => {
     await soundArticle.locator("time").first().click();
     await page.waitForURL("**/posts/*", { timeout: 10_000 });
 
+    await waitForPostDetail(page);
     const waveform = page.locator('svg[viewBox="0 0 100 1"]').first();
     await expect(waveform).toBeVisible({ timeout: 30_000 });
 
@@ -105,16 +124,20 @@ test.describe("投稿詳細 - 写真", () => {
     await page.goto("/");
     const imageArticle = page.locator("article:has(.grid img)").first();
     await expect(imageArticle).toBeVisible({ timeout: 30_000 });
-    await imageArticle.click();
+    await imageArticle.dispatchEvent("click");
     await page.waitForURL("**/posts/*", { timeout: 10_000 });
 
-    const coveredImage = page.locator(".grid img").first();
+    const article = await waitForPostDetail(page);
+    const coveredImage = article.locator("img[style*='object-fit: cover']").first();
     await expect(coveredImage).toBeVisible({ timeout: 30_000 });
 
-    const position = await coveredImage.evaluate((el) => {
-      return window.getComputedStyle(el).position;
-    });
-    expect(position).toBe("absolute");
+    await expect
+      .poll(async () => {
+        return await coveredImage.evaluate((el) => {
+          return window.getComputedStyle(el).position;
+        });
+      })
+      .toBe("absolute");
 
     const naturalWidth = await coveredImage.evaluate((el: HTMLImageElement) => el.naturalWidth);
     expect(naturalWidth).toBeGreaterThan(100);

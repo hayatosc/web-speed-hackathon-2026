@@ -166,69 +166,64 @@ router.post("/posts", async (c) => {
   let movieId: string | null = null;
   let soundId: string | null = null;
 
-  await db.transaction(async (tx) => {
-    // Handle movie creation if provided
-    const bodyMovieId =
-      typeof body?.movie?.id === "string" && body.movie.id.length > 0 ? body.movie.id : undefined;
-    if (bodyMovieId !== undefined) {
-      movieId = bodyMovieId;
-      const existingMovie = await tx.query.movies.findFirst({
-        where: eq(schema.movies.id, bodyMovieId),
-      });
-      if (!existingMovie) {
-        await tx.insert(schema.movies).values({ id: bodyMovieId });
-      }
+  // better-sqlite3 transactions must stay synchronous; keep the write flow explicit here.
+  const bodyMovieId =
+    typeof body?.movie?.id === "string" && body.movie.id.length > 0 ? body.movie.id : undefined;
+  if (bodyMovieId !== undefined) {
+    movieId = bodyMovieId;
+    const existingMovie = await db.query.movies.findFirst({
+      where: eq(schema.movies.id, bodyMovieId),
+    });
+    if (!existingMovie) {
+      await db.insert(schema.movies).values({ id: bodyMovieId });
     }
+  }
 
-    // Handle sound creation if provided
-    const bodySoundId =
-      typeof body?.sound?.id === "string" && body.sound.id.length > 0 ? body.sound.id : undefined;
-    if (bodySoundId !== undefined) {
-      soundId = bodySoundId;
-      const existingSound = await tx.query.sounds.findFirst({
-        where: eq(schema.sounds.id, bodySoundId),
+  const bodySoundId =
+    typeof body?.sound?.id === "string" && body.sound.id.length > 0 ? body.sound.id : undefined;
+  if (bodySoundId !== undefined) {
+    soundId = bodySoundId;
+    const existingSound = await db.query.sounds.findFirst({
+      where: eq(schema.sounds.id, bodySoundId),
+    });
+    if (!existingSound) {
+      await db.insert(schema.sounds).values({
+        id: bodySoundId,
+        title: body.sound.title ?? "Unknown",
+        artist: body.sound.artist ?? "Unknown",
       });
-      if (!existingSound) {
-        await tx.insert(schema.sounds).values({
-          id: bodySoundId,
-          title: body.sound.title ?? "Unknown",
-          artist: body.sound.artist ?? "Unknown",
+    }
+  }
+
+  await db.insert(schema.posts).values({
+    id: postId,
+    userId,
+    text: typeof body?.text === "string" ? body.text : "",
+    movieId,
+    soundId,
+    createdAt: now,
+  });
+
+  if (body.images && Array.isArray(body.images)) {
+    for (const img of body.images) {
+      if (img?.id) {
+        const existingImage = await db.query.images.findFirst({
+          where: eq(schema.images.id, img.id),
+        });
+        if (!existingImage) {
+          await db.insert(schema.images).values({
+            id: img.id,
+            alt: img.alt ?? "",
+            createdAt: now,
+          });
+        }
+        await db.insert(schema.postsImagesRelations).values({
+          postId,
+          imageId: img.id,
         });
       }
     }
-
-    // Create post
-    await tx.insert(schema.posts).values({
-      id: postId,
-      userId,
-      text: typeof body?.text === "string" ? body.text : "",
-      movieId,
-      soundId,
-      createdAt: now,
-    });
-
-    // Handle images if provided
-    if (body.images && Array.isArray(body.images)) {
-      for (const img of body.images) {
-        if (img?.id) {
-          const existingImage = await tx.query.images.findFirst({
-            where: eq(schema.images.id, img.id),
-          });
-          if (!existingImage) {
-            await tx.insert(schema.images).values({
-              id: img.id,
-              alt: img.alt ?? "",
-              createdAt: now,
-            });
-          }
-          await tx.insert(schema.postsImagesRelations).values({
-            postId,
-            imageId: img.id,
-          });
-        }
-      }
-    }
-  });
+  }
 
   const post = await fetchPostById(postId);
   return c.json(post);

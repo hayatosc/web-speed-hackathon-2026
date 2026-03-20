@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import type { DrizzleDB } from "@web-speed-hackathon-2026/server/src/db";
 import { schema } from "@web-speed-hackathon-2026/server/src/db";
+import { normalizeStoredPassword } from "@web-speed-hackathon-2026/server/src/password";
 import type {
   CommentSeed,
   DirectMessageConversationSeed,
@@ -85,7 +86,12 @@ export async function insertSeeds(db: DrizzleDB) {
     await db.insert(schema.sounds).values(batch);
   });
   await readJsonlFileBatched<UserSeed>("users.jsonl", async (batch) => {
-    await db.insert(schema.users).values(batch);
+    await db.insert(schema.users).values(
+      batch.map((user) => ({
+        ...user,
+        password: normalizeStoredPassword(user.password),
+      })),
+    );
   });
   await readJsonlFileBatched<PostSeed>("posts.jsonl", async (batch) => {
     await db.insert(schema.posts).values(batch);

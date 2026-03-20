@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 
 import { DATABASE_PATH } from "@web-speed-hackathon-2026/server/src/paths";
+import { isBcryptHash, normalizeStoredPassword } from "@web-speed-hackathon-2026/server/src/password";
 
 import * as schema from "./schema";
 
@@ -13,6 +14,39 @@ export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
 
 let _db: DrizzleDB | null = null;
 let _sqlite: Database.Database | null = null;
+
+function ensureIndexes(sqlite: Database.Database): void {
+  sqlite.exec(`
+    CREATE INDEX IF NOT EXISTS "idx_direct_message_conversations_initiator_id"
+      ON "DirectMessageConversations" ("initiatorId");
+    CREATE INDEX IF NOT EXISTS "idx_direct_message_conversations_member_id"
+      ON "DirectMessageConversations" ("memberId");
+    CREATE INDEX IF NOT EXISTS "idx_direct_messages_conversation_created_at"
+      ON "DirectMessages" ("conversationId", "createdAt");
+    CREATE INDEX IF NOT EXISTS "idx_direct_messages_conversation_sender_is_read"
+      ON "DirectMessages" ("conversationId", "senderId", "isRead");
+  `);
+}
+
+function normalizeUserPasswords(sqlite: Database.Database): void {
+  const users = sqlite
+    .prepare("SELECT id, password FROM Users")
+    .all() as Array<{ id: string; password: string }>;
+  const usersToUpdate = users.filter((user) => !isBcryptHash(user.password));
+
+  if (usersToUpdate.length === 0) {
+    return;
+  }
+
+  const updatePassword = sqlite.prepare('UPDATE "Users" SET "password" = ? WHERE "id" = ?');
+  const transaction = sqlite.transaction((targetUsers: Array<{ id: string; password: string }>) => {
+    for (const user of targetUsers) {
+      updatePassword.run(normalizeStoredPassword(user.password), user.id);
+    }
+  });
+
+  transaction(usersToUpdate);
+}
 
 export function getDb(): DrizzleDB {
   if (_db === null) {
@@ -36,6 +70,8 @@ export async function initializeDatabase(): Promise<void> {
 
   // Initialize better-sqlite3 and drizzle
   _sqlite = new Database(tempPath);
+  ensureIndexes(_sqlite);
+  normalizeUserPasswords(_sqlite);
   _db = drizzle(_sqlite, { schema });
 }
 

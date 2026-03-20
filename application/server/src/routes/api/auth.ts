@@ -1,9 +1,9 @@
-import bcrypt from "bcrypt";
 import { eq } from "drizzle-orm";
 import { Hono } from "hono";
 import { v4 as uuidv4 } from "uuid";
 
 import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
+import { hashPassword, verifyPassword } from "@web-speed-hackathon-2026/server/src/password";
 
 import type { HonoEnv } from "../../types";
 
@@ -11,14 +11,6 @@ const router = new Hono<HonoEnv>();
 
 // Username validation regex
 const USERNAME_REGEX = /^[a-z0-9_-]+$/i;
-
-function hashPassword(password: string): string {
-  return bcrypt.hashSync(password, bcrypt.genSaltSync(8));
-}
-
-function verifyPassword(password: string, hash: string): boolean {
-  return bcrypt.compareSync(password, hash);
-}
 
 // Helper to format user response with profileImage (matching Sequelize's defaultScope)
 async function getUserWithProfileImage(userId: string) {

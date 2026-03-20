@@ -111,6 +111,58 @@ function formatConversation(conv: {
   };
 }
 
+function formatConversationSummary(conv: {
+  id: string;
+  initiator: {
+    id: string;
+    username: string;
+    name: string;
+    description: string;
+    password: string;
+    profileImageId: string;
+    createdAt: string;
+    profileImage: { id: string; alt: string } | null;
+  };
+  member: {
+    id: string;
+    username: string;
+    name: string;
+    description: string;
+    password: string;
+    profileImageId: string;
+    createdAt: string;
+    profileImage: { id: string; alt: string } | null;
+  };
+  lastMessage: {
+    id: string;
+    conversationId: string;
+    senderId: string;
+    body: string;
+    isRead: boolean;
+    createdAt: string;
+    updatedAt: string;
+    sender: {
+      id: string;
+      username: string;
+      name: string;
+      description: string;
+      password: string;
+      profileImageId: string;
+      createdAt: string;
+      profileImage: { id: string; alt: string } | null;
+    };
+  };
+  hasUnread: boolean;
+}) {
+  return {
+    id: conv.id,
+    initiator: formatUser(conv.initiator),
+    member: formatUser(conv.member),
+    lastMessage: formatDirectMessage(conv.lastMessage),
+    hasUnread: conv.hasUnread,
+  };
+}
+
 async function getUnreadCount(userId: string): Promise<number> {
   const db = getDb();
 
@@ -205,29 +257,55 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
             profileImage: true,
           },
         },
-        messages: {
-          with: {
-            sender: {
-              with: {
-                profileImage: true,
-              },
-            },
-          },
-          orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-        },
       },
     });
 
-    // Filter to only conversations with messages and sort by latest message
-    const conversationsWithMessages = conversations
-      .filter((conv) => conv.messages.length > 0)
-      .sort((a, b) => {
-        const aLatest = a.messages[a.messages.length - 1]?.createdAt ?? "";
-        const bLatest = b.messages[b.messages.length - 1]?.createdAt ?? "";
-        return bLatest.localeCompare(aLatest);
-      });
+    const summaries = await Promise.all(
+      conversations.map(async (conversation) => {
+        const peerId =
+          conversation.initiatorId !== userId
+            ? conversation.initiatorId
+            : conversation.memberId;
 
-    const result = conversationsWithMessages.map(formatConversation);
+        const [lastMessage, unreadMessage] = await Promise.all([
+          db.query.directMessages.findFirst({
+            where: eq(schema.directMessages.conversationId, conversation.id),
+            with: {
+              sender: {
+                with: {
+                  profileImage: true,
+                },
+              },
+            },
+            orderBy: (messages, { desc }) => [desc(messages.createdAt)],
+          }),
+          db.query.directMessages.findFirst({
+            where: and(
+              eq(schema.directMessages.conversationId, conversation.id),
+              eq(schema.directMessages.senderId, peerId),
+              eq(schema.directMessages.isRead, false),
+            ),
+            columns: { id: true },
+          }),
+        ]);
+
+        if (lastMessage === undefined) {
+          return null;
+        }
+
+        return formatConversationSummary({
+          id: conversation.id,
+          initiator: conversation.initiator,
+          member: conversation.member,
+          lastMessage,
+          hasUnread: unreadMessage !== undefined,
+        });
+      }),
+    );
+
+    const result = summaries
+      .filter((summary): summary is NonNullable<typeof summary> => summary !== null)
+      .sort((a, b) => b.lastMessage.createdAt.localeCompare(a.lastMessage.createdAt));
 
     return c.json(result);
   });
