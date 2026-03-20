@@ -176,11 +176,13 @@ jobs:
             - name: Post scoring result comment
               run: |
                   SCORE_BODY=$(cat /tmp/score.txt)
+                  {
+                    printf '## Scoring Result\n```text\n'
+                    printf '%s\n' "$SCORE_BODY"
+                    printf '```\n'
+                  } > /tmp/score-comment.md
                   gh pr comment ${{ github.event.number }} \
-                    --body "## Scoring Result
-\`\`\`
-${SCORE_BODY}
-\`\`\`" \
+                    --body-file /tmp/score-comment.md \
                     --repo ${{ github.repository }}
               env:
                   GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
