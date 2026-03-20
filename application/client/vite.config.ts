@@ -39,19 +39,22 @@ function binaryPlugin(): Plugin {
 }
 
 export default defineConfig(async () => {
-  const { visualizer } = await import("rollup-plugin-visualizer");
+  const plugins = [binaryPlugin(), react()];
 
-  return {
-    plugins: [
-      binaryPlugin(),
-      react(),
+  if (process.env["ANALYZE"]) {
+    const { visualizer } = await import("rollup-plugin-visualizer");
+    plugins.push(
       visualizer({
         filename: resolve(__dirname, "../dist/stats.html"),
         open: true,
         gzipSize: true,
         brotliSize: true,
       }),
-    ],
+    );
+  }
+
+  return {
+    plugins,
     resolve: {
       alias: [
         {

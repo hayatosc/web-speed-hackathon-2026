@@ -1,10 +1,6 @@
 import { gzip } from "pako";
 
-/**
- * fetch 失敗時に responseJSON を保持するエラークラス。
- * AuthModalContainer の getErrorCode が err.responseJSON を参照するため互換性が必要。
- */
-class HttpError extends Error {
+export class HttpError extends Error {
   readonly responseJSON: unknown;
 
   constructor(status: number, responseJSON: unknown, url: string) {
