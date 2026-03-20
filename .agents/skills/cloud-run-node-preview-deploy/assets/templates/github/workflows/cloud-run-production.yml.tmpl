@@ -1,0 +1,62 @@
+name: cloud-run-production
+
+on:
+  push:
+    branches:
+      - __PRODUCTION_BRANCH__
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_PROJECT_ID: __PROJECT_ID__
+  GCP_REGION: __REGION__
+  GCP_SERVICE: __SERVICE_NAME__
+  GCP_WORKLOAD_IDENTITY_PROVIDER: __WORKLOAD_IDENTITY_PROVIDER__
+  GCP_DEPLOYER_SERVICE_ACCOUNT: __DEPLOYER_SERVICE_ACCOUNT__
+  GCP_PRODUCTION_MAX_INSTANCES: "__PRODUCTION_MAX_INSTANCES__"
+  GCP_PRODUCTION_MIN_INSTANCES: "__PRODUCTION_MIN_INSTANCES__"
+
+concurrency:
+  group: cloud-run-production
+  cancel-in-progress: true
+
+jobs:
+  deploy-production:
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - name: Deploy production
+        shell: bash
+        run: |
+          gcloud run deploy "$GCP_SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --source . \
+            --max-instances "$GCP_PRODUCTION_MAX_INSTANCES" \
+            --min-instances "$GCP_PRODUCTION_MIN_INSTANCES" \
+            __AUTH_FLAG__ \
+            --quiet \
+            --labels "managed-by=github-actions,environment=production"
+
+      - name: Record production URL
+        shell: bash
+        run: |
+          url="$(gcloud run services describe "$GCP_SERVICE" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --format='value(status.url)')"
+          echo "Production URL: $url" >> "$GITHUB_STEP_SUMMARY"

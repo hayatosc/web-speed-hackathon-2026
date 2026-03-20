@@ -1,0 +1,155 @@
+name: cloud-run-preview
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+env:
+  GCP_PROJECT_ID: __PROJECT_ID__
+  GCP_REGION: __REGION__
+  GCP_SERVICE: __SERVICE_NAME__
+  GCP_WORKLOAD_IDENTITY_PROVIDER: __WORKLOAD_IDENTITY_PROVIDER__
+  GCP_DEPLOYER_SERVICE_ACCOUNT: __DEPLOYER_SERVICE_ACCOUNT__
+  GCP_PREVIEW_MAX_INSTANCES: "__PREVIEW_MAX_INSTANCES__"
+  GCP_PREVIEW_MIN_INSTANCES: "__PREVIEW_MIN_INSTANCES__"
+
+concurrency:
+  group: cloud-run-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-preview:
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - id: naming
+        shell: bash
+        run: |
+          base="$GCP_SERVICE"
+          base="$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-')"
+          base="${base#-}"
+          base="${base%-}"
+          suffix="pr-${{ github.event.pull_request.number }}"
+          max_base_len=$((49 - ${#suffix} - 1))
+          if [ "$max_base_len" -lt 1 ]; then
+            echo "Preview service name budget is too small" >&2
+            exit 1
+          fi
+          base="${base:0:max_base_len}"
+          base="${base%-}"
+          if [ -z "$base" ]; then
+            echo "Preview service name is empty after normalization" >&2
+            exit 1
+          fi
+          echo "service=${base}-${suffix}" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy preview
+        shell: bash
+        run: |
+          gcloud run deploy "${{ steps.naming.outputs.service }}" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --source . \
+            --max-instances "$GCP_PREVIEW_MAX_INSTANCES" \
+            --min-instances "$GCP_PREVIEW_MIN_INSTANCES" \
+            __AUTH_FLAG__ \
+            --quiet \
+            --labels "managed-by=github-actions,environment=preview,pr=${{ github.event.pull_request.number }}"
+
+      - id: preview_url
+        shell: bash
+        run: |
+          url="$(gcloud run services describe "${{ steps.naming.outputs.service }}" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --format='value(status.url)')"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Preview URL: $url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upsert preview comment
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 .github/scripts/upsert_preview_comment.py \
+            --repo "${{ github.repository }}" \
+            --issue-number "${{ github.event.pull_request.number }}" \
+            --service "${{ steps.naming.outputs.service }}" \
+            --region "$GCP_REGION" \
+            --url "${{ steps.preview_url.outputs.url }}"
+
+  skip-fork-preview:
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name != github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain why preview was skipped
+        run: |
+          echo "Preview deploy skipped for forked PRs because repository secrets and trusted OIDC access are not available on pull_request events from forks." >> "$GITHUB_STEP_SUMMARY"
+
+  cleanup-preview:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ env.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ env.GCP_DEPLOYER_SERVICE_ACCOUNT }}
+          create_credentials_file: true
+
+      - uses: google-github-actions/setup-gcloud@v3
+
+      - id: naming
+        shell: bash
+        run: |
+          base="$GCP_SERVICE"
+          base="$(printf '%s' "$base" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9-' '-')"
+          base="${base#-}"
+          base="${base%-}"
+          suffix="pr-${{ github.event.pull_request.number }}"
+          max_base_len=$((49 - ${#suffix} - 1))
+          if [ "$max_base_len" -lt 1 ]; then
+            echo "Preview service name budget is too small" >&2
+            exit 1
+          fi
+          base="${base:0:max_base_len}"
+          base="${base%-}"
+          if [ -z "$base" ]; then
+            echo "Preview service name is empty after normalization" >&2
+            exit 1
+          fi
+          echo "service=${base}-${suffix}" >> "$GITHUB_OUTPUT"
+
+      - name: Delete preview service if it exists
+        shell: bash
+        run: |
+          if gcloud run services describe "${{ steps.naming.outputs.service }}" \
+            --project "$GCP_PROJECT_ID" \
+            --region "$GCP_REGION" \
+            --format='value(status.url)' >/dev/null 2>&1; then
+            gcloud run services delete "${{ steps.naming.outputs.service }}" \
+              --project "$GCP_PROJECT_ID" \
+              --region "$GCP_REGION" \
+              --quiet
+          else
+            echo "Preview service already deleted" >> "$GITHUB_STEP_SUMMARY"
+          fi

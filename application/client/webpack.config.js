@@ -25,7 +25,7 @@ const config = {
     ],
     static: [PUBLIC_PATH, UPLOAD_PATH],
   },
-  devtool: "inline-source-map",
+  devtool: false,
   entry: {
     main: [
       "core-js",
@@ -128,7 +128,7 @@ const config = {
     },
   },
   optimization: {
-    minimize: false,
+    minimize: true,
     splitChunks: false,
     concatenateModules: false,
     usedExports: false,

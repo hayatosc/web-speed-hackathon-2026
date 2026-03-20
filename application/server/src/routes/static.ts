@@ -1,5 +1,6 @@
 import history from "connect-history-api-fallback";
 import { Router } from "express";
+import expressStaticGzip from "express-static-gzip";
 import serveStatic from "serve-static";
 
 import {
@@ -28,8 +29,12 @@ staticRouter.use(
 );
 
 staticRouter.use(
-  serveStatic(CLIENT_DIST_PATH, {
-    etag: false,
-    lastModified: false,
+  expressStaticGzip(CLIENT_DIST_PATH, {
+    enableBrotli: true,
+    orderPreference: ["br", "gz"],
+    serveStatic: {
+      etag: false,
+      lastModified: false,
+    },
   }),
 );

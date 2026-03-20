@@ -10,6 +10,7 @@ LABEL fly_launch_runtime="Node.js"
 ENV PNPM_HOME=/pnpm
 
 WORKDIR /app
+RUN --mount=type=cache,target=/root/.apt apt-get update && apt-get install -y brotli && rm -rf /var/lib/apt/lists/*
 RUN --mount=type=cache,target=/root/.npm npm install -g pnpm@${PNPM_VERSION}
 
 FROM base AS build
@@ -22,6 +23,8 @@ RUN --mount=type=cache,target=/pnpm/store pnpm install --frozen-lockfile
 COPY ./application .
 
 RUN NODE_OPTIONS="--max-old-space-size=4096" pnpm build
+
+RUN find /app/dist -type f \( -name "*.js" -o -name "*.css" \) -exec gzip -k {} \; -exec brotli -k {} \;
 
 RUN --mount=type=cache,target=/pnpm/store CI=true pnpm install --frozen-lockfile --prod --filter @web-speed-hackathon-2026/server
 
