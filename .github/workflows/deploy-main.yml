@@ -59,6 +59,7 @@ jobs:
                     --project "${{ env.GCP_PROJECT_ID }}" \
                     --region "${{ env.GCP_REGION }}" \
                     --image "${{ env.IMAGE }}:${{ github.sha }}" \
+                    --allow-unauthenticated \
                     --min-instances "${{ env.PRODUCTION_MIN_INSTANCES }}" \
                     --max-instances "${{ env.PRODUCTION_MAX_INSTANCES }}" \
                     --labels "managed-by=github-actions,environment=production" \
