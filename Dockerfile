@@ -42,5 +42,6 @@ COPY --from=build /app/server/database.sqlite ./server/database.sqlite
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/public ./public
 
-EXPOSE 8080
+ENV PORT=3000
+EXPOSE 3000
 CMD ["node", "server/dist/index.js"]
