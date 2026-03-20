@@ -12,14 +12,7 @@ import { getProfileImagePath } from "@web-speed-hackathon-2026/client/src/utils/
 const isClickedAnchorOrButton = (target: EventTarget | null, currentTarget: Element): boolean => {
   while (target !== null && target instanceof Element) {
     const tagName = target.tagName.toLowerCase();
-    if (tagName === "a") {
-      return true;
-    }
-    if (
-      tagName === "button" &&
-      target instanceof HTMLElement &&
-      target.dataset["preventPostNavigation"] === "true"
-    ) {
+    if (tagName === "a" || tagName === "button") {
       return true;
     }
     if (currentTarget === target) {
