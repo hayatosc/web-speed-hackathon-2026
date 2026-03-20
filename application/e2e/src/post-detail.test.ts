@@ -7,7 +7,7 @@ test.describe("投稿詳細", () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
   });
 
-  test("投稿が表示される", async ({ page }) => {
+  test("投稿が表示される @vrt", async ({ page }) => {
     await page.goto("/");
     const firstArticle = page.locator("article").first();
     await expect(firstArticle).toBeVisible({ timeout: 30_000 });
@@ -40,7 +40,7 @@ test.describe("投稿詳細 - 動画", () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
   });
 
-  test("動画が自動再生され、クリックで一時停止・再生を切り替えられる", async ({ page }) => {
+  test("動画が自動再生され、クリックで一時停止・再生を切り替えられる @vrt", async ({ page }) => {
     await page.goto("/");
     const movieArticle = page.locator("article:has(canvas)").first();
     await expect(movieArticle).toBeVisible({ timeout: 30_000 });
@@ -70,7 +70,7 @@ test.describe("投稿詳細 - 音声", () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
   });
 
-  test("音声の波形が表示され、再生ボタンで切り替えられる", async ({ page }) => {
+  test("音声の波形が表示され、再生ボタンで切り替えられる @vrt", async ({ page }) => {
     await page.goto("/");
     const soundArticle = page.locator('article:has(svg[viewBox="0 0 100 1"])').first();
     await expect(soundArticle).toBeVisible({ timeout: 30_000 });
@@ -101,7 +101,7 @@ test.describe("投稿詳細 - 写真", () => {
     await page.setViewportSize({ width: 1920, height: 1080 });
   });
 
-  test("写真がcover拡縮し、画像サイズが著しく荒くない", async ({ page }) => {
+  test("写真がcover拡縮し、画像サイズが著しく荒くない @vrt", async ({ page }) => {
     await page.goto("/");
     const imageArticle = page.locator("article:has(.grid img)").first();
     await expect(imageArticle).toBeVisible({ timeout: 30_000 });

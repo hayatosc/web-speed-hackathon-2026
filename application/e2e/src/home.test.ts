@@ -8,7 +8,7 @@ test.describe("ホーム", () => {
     await page.goto("/", { waitUntil: "domcontentloaded" });
   });
 
-  test("タイムラインが表示される", async ({ page }) => {
+  test("タイムラインが表示される @vrt", async ({ page }) => {
     const articles = page.locator("article");
     await expect(articles.first()).toBeVisible({ timeout: 30_000 });
     const count = await articles.count();
@@ -61,7 +61,7 @@ test.describe("ホーム", () => {
 });
 
 test.describe("404ページ", () => {
-  test("存在しないページで404が表示される", async ({ page }) => {
+  test("存在しないページで404が表示される @vrt", async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto("/this-page-does-not-exist");
     await scrollEntire(page);

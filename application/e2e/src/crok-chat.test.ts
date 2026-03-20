@@ -10,7 +10,7 @@ test.describe("Crok AIチャット", () => {
     await page.waitForURL("**/crok", { timeout: 10_000 });
   });
 
-  test("サジェスト候補が表示される", async ({ page }) => {
+  test("サジェスト候補が表示される @vrt", async ({ page }) => {
     // VRT: Crokページ
     await waitForVisibleMedia(page);
     await expect(page).toHaveScreenshot("crok-Crok.png", {
@@ -37,7 +37,7 @@ test.describe("Crok AIチャット", () => {
     });
   });
 
-  test("質問を送信するとAIの応答が表示される", async ({ page }) => {
+  test("質問を送信するとAIの応答が表示される @vrt", async ({ page }) => {
     const chatInput = page.getByPlaceholder("メッセージを入力...");
     const prompt =
       "『走れメロス』って、冷笑系の“どうせ人なんか信じても無駄”に対する話なんだと思うんだけどどう？";

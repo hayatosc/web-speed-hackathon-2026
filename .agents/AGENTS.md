@@ -30,13 +30,20 @@
 - Re-measure after each major batch of changes.
 - Use the official scorer workflow for the target year whenever a public local CLI exists.
 - Inspect the scorer before assuming local execution details, because the public repo shape differs by year.
+- Never modify the scoring tool, VRT, their fixtures, snapshots, configs, helper scripts, or bundled assets in order to make results easier to pass.
+- Treat the official scoring tool and VRT as immutable external judges. If they appear wrong or inconvenient, investigate and document the issue, but do not patch them locally to improve outcomes.
 
 ## Regulation Guardrails
+- Regulation compliance is non-negotiable. Never trade compliance for speed, and never ship or propose changes that only look fast by weakening verification.
 - Do not break `POST /api/initialize` or any equivalent initialization endpoint required by the competition.
 - Do not introduce obvious design regressions, missing content, broken navigation, or failed visual checks in the latest Google Chrome.
 - Keep all required pages accessible and working.
 - Run regulation checks after every risky change set, especially after detuning removal, build changes, asset changes, and library swaps.
 - Preserve functional behavior unless a change is clearly allowed and verified.
+- Do not modify, stub, bypass, or disable the official scoring tool or VRT. This includes changes that suppress failures, rewrite expectations, special-case test environments, or alter captured outputs.
+- Do not implement test-aware behavior whose purpose is to evade scoring or visual regression checks. If an implementation behaves differently only to dodge the scorer or VRT, it is prohibited.
+- Do not hide content, skip required work, spoof readiness, or serve alternate behavior only under detected test conditions.
+- When in doubt, prefer the more conservative interpretation of the regulations and verify against the official docs or scorer before acting.
 
 ## Issue Creation
 - If you find room to improve the implementation, create a GitHub issue with the `gh` command instead of leaving the idea undocumented.
