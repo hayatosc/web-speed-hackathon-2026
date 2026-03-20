@@ -37,21 +37,24 @@ export const SoundPlayer = ({ sound }: Props) => {
     });
   }, []);
 
-  if (isLoading || data === null || blobUrl === null) {
-    return null;
-  }
-
   return (
     <div className="bg-cax-surface-subtle flex h-full w-full items-center justify-center">
-      <audio ref={audioRef} loop={true} onTimeUpdate={handleTimeUpdate} src={blobUrl} />
+      {blobUrl !== null ? (
+        <audio ref={audioRef} loop={true} onTimeUpdate={handleTimeUpdate} src={blobUrl} />
+      ) : null}
       <div className="p-2">
-        <button
-          className="bg-cax-accent text-cax-surface-raised flex h-8 w-8 items-center justify-center rounded-full text-sm hover:opacity-75"
-          onClick={handleTogglePlaying}
-          type="button"
-        >
-          <FontAwesomeIcon iconType={isPlaying ? "pause" : "play"} styleType="solid" />
-        </button>
+        {isLoading || data === null || blobUrl === null ? (
+          <div aria-hidden="true" className="bg-cax-text-subtle/20 h-8 w-8 rounded-full" />
+        ) : (
+          <button
+            className="bg-cax-accent text-cax-surface-raised flex h-8 w-8 items-center justify-center rounded-full text-sm hover:opacity-75"
+            data-prevent-post-navigation="true"
+            onClick={handleTogglePlaying}
+            type="button"
+          >
+            <FontAwesomeIcon iconType={isPlaying ? "pause" : "play"} styleType="solid" />
+          </button>
+        )}
       </div>
       <div className="flex h-full min-w-0 shrink grow flex-col pt-2">
         <p className="overflow-hidden text-sm font-bold text-ellipsis whitespace-nowrap">
@@ -62,15 +65,19 @@ export const SoundPlayer = ({ sound }: Props) => {
         </p>
         <div className="pt-2">
           <AspectRatioBox aspectHeight={1} aspectWidth={10}>
-            <div className="relative h-full w-full">
-              <div className="absolute inset-0 h-full w-full">
-                <SoundWaveSVG soundData={data} />
+            {isLoading || data === null || blobUrl === null ? (
+              <div aria-hidden="true" className="bg-cax-text-subtle/10 h-full w-full rounded" />
+            ) : (
+              <div className="relative h-full w-full">
+                <div className="absolute inset-0 h-full w-full">
+                  <SoundWaveSVG soundData={data} />
+                </div>
+                <div
+                  className="bg-cax-surface-subtle absolute inset-0 h-full w-full opacity-75"
+                  style={{ left: `${currentTimeRatio * 100}%` }}
+                ></div>
               </div>
-              <div
-                className="bg-cax-surface-subtle absolute inset-0 h-full w-full opacity-75"
-                style={{ left: `${currentTimeRatio * 100}%` }}
-              ></div>
-            </div>
+            )}
           </AspectRatioBox>
         </div>
       </div>
