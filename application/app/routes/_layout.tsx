@@ -1,11 +1,9 @@
-import { useCallback, useEffect, useId, useState } from "react";
+import { Fragment, useCallback, useEffect, useId, useState } from "react";
 import { Outlet, useNavigate, useOutletContext, useLocation } from "react-router";
-import { Provider } from "react-redux";
 
 import { AppPage } from "@web-speed-hackathon-2026/client/app/components/application/AppPage";
 import { AuthModalContainer } from "@web-speed-hackathon-2026/client/app/containers/AuthModalContainer";
 import { NewPostModalContainer } from "@web-speed-hackathon-2026/client/app/containers/NewPostModalContainer";
-import { createAppStore } from "@web-speed-hackathon-2026/client/app/store";
 import { fetchJSON, sendJSON } from "@web-speed-hackathon-2026/client/app/utils/fetchers";
 
 export type LayoutOutletContext = {
@@ -19,7 +17,6 @@ export function useLayoutOutletContext(): LayoutOutletContext {
 }
 
 export default function Layout() {
-  const [store] = useState(() => createAppStore());
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
@@ -52,7 +49,7 @@ export default function Layout() {
   }, [navigate]);
 
   return (
-    <Provider store={store}>
+    <Fragment>
       <AppPage
         activeUser={activeUser}
         authModalId={authModalId}
@@ -63,6 +60,6 @@ export default function Layout() {
       </AppPage>
       <AuthModalContainer id={authModalId} onUpdateActiveUser={setActiveUser} />
       <NewPostModalContainer id={newPostModalId} />
-    </Provider>
+    </Fragment>
   );
 }
