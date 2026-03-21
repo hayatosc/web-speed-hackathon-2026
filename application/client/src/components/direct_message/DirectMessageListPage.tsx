@@ -1,48 +1,18 @@
 import moment from "moment";
-import { useCallback, useEffect, useState } from "react";
 
 import { Button } from "@web-speed-hackathon-2026/client/src/components/foundation/Button";
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/src/components/foundation/FontAwesomeIcon";
 import { Link } from "@web-speed-hackathon-2026/client/src/components/foundation/Link";
-import { useWs } from "@web-speed-hackathon-2026/client/src/hooks/use_ws";
-import { fetchJSON } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
 import { getProfileImagePath } from "@web-speed-hackathon-2026/client/src/utils/get_path";
 
 interface Props {
   activeUser: Models.User;
+  conversations: Array<Models.DirectMessageConversationSummary> | null;
+  error: Error | null;
   newDmModalId: string;
 }
 
-export const DirectMessageListPage = ({ activeUser, newDmModalId }: Props) => {
-  const [conversations, setConversations] =
-    useState<Array<Models.DirectMessageConversationSummary> | null>(null);
-  const [error, setError] = useState<Error | null>(null);
-
-  const loadConversations = useCallback(async () => {
-    if (activeUser == null) {
-      return;
-    }
-
-    try {
-      const conversations = await fetchJSON<Array<Models.DirectMessageConversationSummary>>(
-        "/api/v1/dm",
-      );
-      setConversations(conversations);
-      setError(null);
-    } catch (error) {
-      setConversations(null);
-      setError(error as Error);
-    }
-  }, [activeUser]);
-
-  useEffect(() => {
-    void loadConversations();
-  }, [loadConversations]);
-
-  useWs("/api/v1/dm/unread", () => {
-    void loadConversations();
-  });
-
+export const DirectMessageListPage = ({ activeUser, conversations, error, newDmModalId }: Props) => {
   if (conversations == null) {
     return null;
   }

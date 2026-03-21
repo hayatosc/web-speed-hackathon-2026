@@ -1,9 +1,10 @@
-import { ReactEventHandler, useCallback, useMemo, useRef, useState } from "react";
+import { ReactEventHandler, useCallback, useEffect, useRef, useState } from "react";
 
 import { AspectRatioBox } from "@web-speed-hackathon-2026/client/src/components/foundation/AspectRatioBox";
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/src/components/foundation/FontAwesomeIcon";
 import { SoundWaveSVG } from "@web-speed-hackathon-2026/client/src/components/foundation/SoundWaveSVG";
 import { useFetch } from "@web-speed-hackathon-2026/client/src/hooks/use_fetch";
+import { useNearScreen } from "@web-speed-hackathon-2026/client/src/hooks/use_near_screen";
 import { fetchBinary } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
 import { getSoundPath } from "@web-speed-hackathon-2026/client/src/utils/get_path";
 
@@ -12,10 +13,22 @@ interface Props {
 }
 
 export const SoundPlayer = ({ sound }: Props) => {
-  const { data, isLoading } = useFetch(getSoundPath(sound.id), fetchBinary);
+  const { isNearScreen, ref: containerRef } = useNearScreen<HTMLDivElement>();
+  const { data, isLoading } = useFetch(isNearScreen ? getSoundPath(sound.id) : "", fetchBinary);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
 
-  const blobUrl = useMemo(() => {
-    return data !== null ? URL.createObjectURL(new Blob([data])) : null;
+  useEffect(() => {
+    if (data === null) {
+      setBlobUrl(null);
+      return;
+    }
+
+    const nextBlobUrl = URL.createObjectURL(new Blob([data]));
+    setBlobUrl(nextBlobUrl);
+
+    return () => {
+      URL.revokeObjectURL(nextBlobUrl);
+    };
   }, [data]);
 
   const [currentTimeRatio, setCurrentTimeRatio] = useState(0);
@@ -38,7 +51,7 @@ export const SoundPlayer = ({ sound }: Props) => {
   }, []);
 
   return (
-    <div className="bg-cax-surface-subtle flex h-full w-full items-center justify-center">
+    <div ref={containerRef} className="bg-cax-surface-subtle flex h-full w-full items-center justify-center">
       {blobUrl !== null ? (
         <audio ref={audioRef} loop={true} onTimeUpdate={handleTimeUpdate} src={blobUrl} />
       ) : null}

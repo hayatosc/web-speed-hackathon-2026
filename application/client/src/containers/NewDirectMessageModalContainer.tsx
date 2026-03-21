@@ -8,10 +8,12 @@ import { NewDirectMessageFormData } from "@web-speed-hackathon-2026/client/src/d
 import { fetchJSON, sendJSON } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
 
 interface Props {
+  activeUser: Models.User;
+  existingConversations: Array<Models.DirectMessageConversationSummary>;
   id: string;
 }
 
-export const NewDirectMessageModalContainer = ({ id }: Props) => {
+export const NewDirectMessageModalContainer = ({ activeUser, existingConversations, id }: Props) => {
   const ref = useRef<HTMLDialogElement>(null);
   const [resetKey, setResetKey] = useState(0);
   useEffect(() => {
@@ -32,7 +34,21 @@ export const NewDirectMessageModalContainer = ({ id }: Props) => {
   const handleSubmit = useCallback(
     async (values: NewDirectMessageFormData) => {
       try {
-        const user = await fetchJSON<Models.User>(`/api/v1/users/${values.username}`);
+        const normalizedUsername = values.username.trim().replace(/^@/, "");
+        const existingConversation = existingConversations.find((conversation) => {
+          const peer =
+            conversation.initiator.id !== activeUser.id
+              ? conversation.initiator
+              : conversation.member;
+          return peer.username === normalizedUsername;
+        });
+
+        if (existingConversation !== undefined) {
+          navigate(`/dm/${existingConversation.id}`);
+          return;
+        }
+
+        const user = await fetchJSON<Models.User>(`/api/v1/users/${normalizedUsername}`);
         const conversation = await sendJSON<Pick<Models.DirectMessageConversation, "id">>(
           `/api/v1/dm?includeMessages=0`,
           {
@@ -46,7 +62,7 @@ export const NewDirectMessageModalContainer = ({ id }: Props) => {
         });
       }
     },
-    [navigate],
+    [activeUser.id, existingConversations, navigate],
   );
 
   return (

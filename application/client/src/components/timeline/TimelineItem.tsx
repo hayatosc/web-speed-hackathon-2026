@@ -41,7 +41,7 @@ export const TimelineItem = ({ post }: Props) => {
     (ev) => {
       const isSelectedText = document.getSelection()?.isCollapsed === false;
       if (!isClickedAnchorOrButton(ev.target, ev.currentTarget) && !isSelectedText) {
-        navigate(`/posts/${post.id}`);
+        navigate(`/posts/${post.id}`, { state: { post } });
       }
     },
     [post, navigate],
@@ -79,7 +79,11 @@ export const TimelineItem = ({ post }: Props) => {
               @{post.user.username}
             </Link>
             <span className="text-cax-text-muted pr-1">-</span>
-            <Link className="text-cax-text-muted pr-1 hover:underline" to={`/posts/${post.id}`}>
+            <Link
+              className="text-cax-text-muted pr-1 hover:underline"
+              state={{ post }}
+              to={`/posts/${post.id}`}
+            >
               <time dateTime={moment(post.createdAt).toISOString()}>
                 {formatLongDate(post.createdAt)}
               </time>

@@ -58,40 +58,10 @@ function formatDirectMessage(message: {
   };
 }
 
-// Helper to format conversation for response
-function formatConversation(conv: {
-  id: string;
-  initiatorId: string;
-  memberId: string;
-  initiator: {
+function formatConversationWithParticipants(
+  conv: {
     id: string;
-    username: string;
-    name: string;
-    description: string;
-    password: string;
-    profileImageId: string;
-    createdAt: string;
-    profileImage: { id: string; alt: string } | null;
-  };
-  member: {
-    id: string;
-    username: string;
-    name: string;
-    description: string;
-    password: string;
-    profileImageId: string;
-    createdAt: string;
-    profileImage: { id: string; alt: string } | null;
-  };
-  messages: Array<{
-    id: string;
-    conversationId: string;
-    senderId: string;
-    body: string;
-    isRead: boolean;
-    createdAt: string;
-    updatedAt: string;
-    sender: {
+    initiator: {
       id: string;
       username: string;
       name: string;
@@ -101,13 +71,41 @@ function formatConversation(conv: {
       createdAt: string;
       profileImage: { id: string; alt: string } | null;
     };
-  }>;
-}) {
+    member: {
+      id: string;
+      username: string;
+      name: string;
+      description: string;
+      password: string;
+      profileImageId: string;
+      createdAt: string;
+      profileImage: { id: string; alt: string } | null;
+    };
+  },
+  messages: Array<{
+    id: string;
+    conversationId: string;
+    senderId: string;
+    body: string;
+    isRead: boolean;
+    createdAt: string;
+    updatedAt: string;
+  }>,
+) {
+  const initiator = formatUser(conv.initiator);
+  const member = formatUser(conv.member);
+
   return {
     id: conv.id,
-    initiator: formatUser(conv.initiator),
-    member: formatUser(conv.member),
-    messages: conv.messages.map(formatDirectMessage),
+    initiator,
+    member,
+    messages: messages.map((message) => {
+      const { senderId, conversationId, ...messageData } = message;
+      return {
+        ...messageData,
+        sender: senderId === initiator.id ? initiator : member,
+      };
+    }),
   };
 }
 
@@ -382,16 +380,6 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
               profileImage: true,
             },
           },
-          messages: {
-            with: {
-              sender: {
-                with: {
-                  profileImage: true,
-                },
-              },
-            },
-            orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-          },
         },
       });
 
@@ -416,16 +404,6 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
                 profileImage: true,
               },
             },
-            messages: {
-              with: {
-                sender: {
-                  with: {
-                    profileImage: true,
-                  },
-                },
-              },
-              orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-            },
           },
         });
       }
@@ -434,7 +412,12 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
         throw new HTTPException(500);
       }
 
-      return c.json(formatConversation(conversation));
+      const messages = await db.query.directMessages.findMany({
+        where: eq(schema.directMessages.conversationId, conversation.id),
+        orderBy: (directMessages, { asc }) => [asc(directMessages.createdAt)],
+      });
+
+      return c.json(formatConversationWithParticipants(conversation, messages));
     }
 
     let conversation = await db.query.directMessageConversations.findFirst({
@@ -552,16 +535,6 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
             profileImage: true,
           },
         },
-        messages: {
-          with: {
-            sender: {
-              with: {
-                profileImage: true,
-              },
-            },
-          },
-          orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-        },
       },
     });
 
@@ -569,7 +542,12 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
       throw new HTTPException(404);
     }
 
-    return c.json(formatConversation(conversation));
+    const messages = await db.query.directMessages.findMany({
+      where: eq(schema.directMessages.conversationId, conversation.id),
+      orderBy: (directMessages, { asc }) => [asc(directMessages.createdAt)],
+    });
+
+    return c.json(formatConversationWithParticipants(conversation, messages));
   });
 
   router.get(

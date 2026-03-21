@@ -1,5 +1,5 @@
 import { Helmet } from "react-helmet";
-import { useParams } from "react-router";
+import { useLocation, useParams } from "react-router";
 
 import { InfiniteScroll } from "@web-speed-hackathon-2026/client/src/components/foundation/InfiniteScroll";
 import { PostPage } from "@web-speed-hackathon-2026/client/src/components/post/PostPage";
@@ -8,18 +8,38 @@ import { useFetch } from "@web-speed-hackathon-2026/client/src/hooks/use_fetch";
 import { useInfiniteFetch } from "@web-speed-hackathon-2026/client/src/hooks/use_infinite_fetch";
 import { fetchJSON } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
 
+interface PostLocationState {
+  post?: Models.Post;
+}
+
+function getInitialPost(state: unknown, postId: string | undefined): Models.Post | null {
+  if (postId === undefined || typeof state !== "object" || state === null || !("post" in state)) {
+    return null;
+  }
+
+  const candidate = (state as PostLocationState).post;
+  if (candidate == null || candidate.id !== postId) {
+    return null;
+  }
+
+  return candidate;
+}
+
 const PostContainerContent = ({ postId }: { postId: string | undefined }) => {
-  const { data: post, isLoading: isLoadingPost } = useFetch<Models.Post>(
+  const location = useLocation();
+  const initialPost = getInitialPost(location.state, postId);
+  const { data: fetchedPost, isLoading: isLoadingPost } = useFetch<Models.Post>(
     `/api/v1/posts/${postId}`,
     fetchJSON,
   );
+  const post = fetchedPost ?? initialPost;
 
   const { data: comments, fetchMore } = useInfiniteFetch<Models.Comment>(
     `/api/v1/posts/${postId}/comments`,
     fetchJSON,
   );
 
-  if (isLoadingPost) {
+  if (isLoadingPost && post === null) {
     return (
       <Helmet>
         <title>読込中 - CaX</title>
