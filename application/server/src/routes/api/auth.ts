@@ -1,11 +1,11 @@
-import { eq } from "drizzle-orm";
-import { Hono } from "hono";
-import { v4 as uuidv4 } from "uuid";
+import { eq } from 'drizzle-orm';
+import { Hono } from 'hono';
+import { randomUUID } from 'node:crypto';
 
-import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
-import { hashPassword, verifyPassword } from "@web-speed-hackathon-2026/server/src/password";
+import { getDb, schema } from '@web-speed-hackathon-2026/server/src/db';
+import { hashPassword, verifyPassword } from '@web-speed-hackathon-2026/server/src/password';
 
-import type { HonoEnv } from "../../types";
+import type { HonoEnv } from '../../types';
 
 const router = new Hono<HonoEnv>();
 
@@ -32,13 +32,13 @@ async function getUserWithProfileImage(userId: string) {
   };
 }
 
-router.post("/signup", async (c) => {
+router.post('/signup', async (c) => {
   const db = getDb();
   const body = await c.req.json();
 
   // Validate username format
-  if (typeof body.username !== "string" || !USERNAME_REGEX.test(body.username)) {
-    return c.json({ code: "INVALID_USERNAME" }, 400);
+  if (typeof body.username !== 'string' || !USERNAME_REGEX.test(body.username)) {
+    return c.json({ code: 'INVALID_USERNAME' }, 400);
   }
 
   // Check if username already exists
@@ -47,28 +47,28 @@ router.post("/signup", async (c) => {
   });
 
   if (existing) {
-    return c.json({ code: "USERNAME_TAKEN" }, 400);
+    return c.json({ code: 'USERNAME_TAKEN' }, 400);
   }
 
-  const userId = uuidv4();
+  const userId = randomUUID();
   const now = new Date().toISOString();
 
   await db.insert(schema.users).values({
     id: userId,
     username: body.username,
-    name: body.name ?? "",
-    description: body.description ?? "",
+    name: body.name ?? '',
+    description: body.description ?? '',
     password: hashPassword(body.password),
-    profileImageId: body.profileImageId ?? "396fe4ce-aa36-4d96-b54e-6db40bae2eed",
+    profileImageId: body.profileImageId ?? '396fe4ce-aa36-4d96-b54e-6db40bae2eed',
     createdAt: now,
   });
 
   const user = await getUserWithProfileImage(userId);
-  c.get("session").userId = userId;
+  c.get('session').userId = userId;
   return c.json(user);
 });
 
-router.post("/signin", async (c) => {
+router.post('/signin', async (c) => {
   const db = getDb();
   const body = await c.req.json();
 
@@ -80,13 +80,13 @@ router.post("/signin", async (c) => {
   });
 
   if (user === undefined) {
-    return c.json({ message: "Bad Request" }, 400);
+    return c.json({ message: 'Bad Request' }, 400);
   }
   if (!verifyPassword(body.password, user.password)) {
-    return c.json({ message: "Bad Request" }, 400);
+    return c.json({ message: 'Bad Request' }, 400);
   }
 
-  c.get("session").userId = user.id;
+  c.get('session').userId = user.id;
 
   // Format response to match Sequelize output
   const { profileImageId, password, ...userData } = user;
@@ -96,8 +96,8 @@ router.post("/signin", async (c) => {
   });
 });
 
-router.post("/signout", async (c) => {
-  c.get("session").userId = undefined;
+router.post('/signout', async (c) => {
+  c.get('session').userId = undefined;
   return c.json({});
 });
 

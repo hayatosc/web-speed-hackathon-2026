@@ -1,11 +1,11 @@
-import { desc, eq, inArray } from "drizzle-orm";
-import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
-import { v4 as uuidv4 } from "uuid";
+import { desc, eq, inArray } from 'drizzle-orm';
+import { Hono } from 'hono';
+import { HTTPException } from 'hono/http-exception';
+import { randomUUID } from 'node:crypto';
 
-import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
+import { getDb, schema } from '@web-speed-hackathon-2026/server/src/db';
 
-import type { HonoEnv } from "../../types";
+import type { HonoEnv } from '../../types';
 
 const router = new Hono<HonoEnv>();
 
@@ -28,16 +28,16 @@ interface PostPayload {
 }
 
 function isPostImagePayload(value: unknown): value is PostImagePayload {
-  if (typeof value !== "object" || value === null) {
+  if (typeof value !== 'object' || value === null) {
     return false;
   }
 
   const payload = value as Record<string, unknown>;
-  if (typeof payload["id"] !== "string" || payload["id"].length === 0) {
+  if (typeof payload['id'] !== 'string' || payload['id'].length === 0) {
     return false;
   }
 
-  if (payload["alt"] !== undefined && typeof payload["alt"] !== "string") {
+  if (payload['alt'] !== undefined && typeof payload['alt'] !== 'string') {
     return false;
   }
 
@@ -110,10 +110,10 @@ async function fetchPostById(postId: string) {
   return formatPost(result);
 }
 
-router.get("/posts", async (c) => {
+router.get('/posts', async (c) => {
   const db = getDb();
-  const limitStr = c.req.query("limit");
-  const offsetStr = c.req.query("offset");
+  const limitStr = c.req.query('limit');
+  const offsetStr = c.req.query('offset');
   const limit = limitStr != null ? Number(limitStr) : undefined;
   const offset = offsetStr != null ? Number(offsetStr) : 0;
 
@@ -141,23 +141,23 @@ router.get("/posts", async (c) => {
   return c.json(posts);
 });
 
-router.get("/posts/:postId", async (c) => {
-  const post = await fetchPostById(c.req.param("postId"));
+router.get('/posts/:postId', async (c) => {
+  const post = await fetchPostById(c.req.param('postId'));
   if (post === null) {
     throw new HTTPException(404);
   }
   return c.json(post);
 });
 
-router.get("/posts/:postId/comments", async (c) => {
+router.get('/posts/:postId/comments', async (c) => {
   const db = getDb();
-  const limitStr = c.req.query("limit");
-  const offsetStr = c.req.query("offset");
+  const limitStr = c.req.query('limit');
+  const offsetStr = c.req.query('offset');
   const limit = limitStr != null ? Number(limitStr) : undefined;
   const offset = offsetStr != null ? Number(offsetStr) : 0;
 
   const commentsResult = await db.query.comments.findMany({
-    where: eq(schema.comments.postId, c.req.param("postId")),
+    where: eq(schema.comments.postId, c.req.param('postId')),
     with: {
       user: {
         with: {
@@ -186,15 +186,15 @@ router.get("/posts/:postId/comments", async (c) => {
   return c.json(comments);
 });
 
-router.post("/posts", async (c) => {
+router.post('/posts', async (c) => {
   const db = getDb();
-  const userId = c.get("session").userId;
+  const userId = c.get('session').userId;
   if (userId === undefined) {
     throw new HTTPException(401);
   }
 
   const body = await c.req.json<PostPayload>();
-  const postId = uuidv4();
+  const postId = randomUUID();
   const now = new Date().toISOString();
 
   // Create post with optional movie and sound
@@ -202,8 +202,7 @@ router.post("/posts", async (c) => {
   let soundId: string | null = null;
 
   // better-sqlite3 transactions must stay synchronous; keep the write flow explicit here.
-  const bodyMovieId =
-    typeof body?.movie?.id === "string" && body.movie.id.length > 0 ? body.movie.id : undefined;
+  const bodyMovieId = typeof body?.movie?.id === 'string' && body.movie.id.length > 0 ? body.movie.id : undefined;
   if (bodyMovieId !== undefined) {
     movieId = bodyMovieId;
     const existingMovie = await db.query.movies.findFirst({
@@ -214,12 +213,9 @@ router.post("/posts", async (c) => {
     }
   }
 
-  const bodySoundId =
-    typeof body?.sound?.id === "string" && body.sound.id.length > 0 ? body.sound.id : undefined;
-  const bodySoundTitle =
-    typeof body?.sound?.title === "string" ? body.sound.title : undefined;
-  const bodySoundArtist =
-    typeof body?.sound?.artist === "string" ? body.sound.artist : undefined;
+  const bodySoundId = typeof body?.sound?.id === 'string' && body.sound.id.length > 0 ? body.sound.id : undefined;
+  const bodySoundTitle = typeof body?.sound?.title === 'string' ? body.sound.title : undefined;
+  const bodySoundArtist = typeof body?.sound?.artist === 'string' ? body.sound.artist : undefined;
   if (bodySoundId !== undefined) {
     soundId = bodySoundId;
     const existingSound = await db.query.sounds.findFirst({
@@ -228,8 +224,8 @@ router.post("/posts", async (c) => {
     if (!existingSound) {
       await db.insert(schema.sounds).values({
         id: bodySoundId,
-        title: bodySoundTitle ?? "Unknown",
-        artist: bodySoundArtist ?? "Unknown",
+        title: bodySoundTitle ?? 'Unknown',
+        artist: bodySoundArtist ?? 'Unknown',
       });
     }
   }
@@ -237,7 +233,7 @@ router.post("/posts", async (c) => {
   await db.insert(schema.posts).values({
     id: postId,
     userId,
-    text: body?.text ?? "",
+    text: body?.text ?? '',
     movieId,
     soundId,
     createdAt: now,
@@ -245,11 +241,7 @@ router.post("/posts", async (c) => {
 
   if (Array.isArray(body.images)) {
     const uniqueImages = Array.from(
-      new Map(
-        body.images
-          .filter((img): img is PostImagePayload => isPostImagePayload(img))
-          .map((img) => [img.id, img]),
-      ).values(),
+      new Map(body.images.filter((img): img is PostImagePayload => isPostImagePayload(img)).map((img) => [img.id, img])).values(),
     );
 
     if (uniqueImages.length > 0) {
@@ -264,7 +256,7 @@ router.post("/posts", async (c) => {
         .filter((img) => !existingImageIds.has(img.id))
         .map((img) => ({
           id: img.id,
-          alt: img.alt ?? "",
+          alt: img.alt ?? '',
           createdAt: now,
         }));
 
