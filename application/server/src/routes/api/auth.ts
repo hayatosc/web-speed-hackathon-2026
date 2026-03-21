@@ -58,7 +58,7 @@ router.post('/signup', async (c) => {
     username: body.username,
     name: body.name ?? '',
     description: body.description ?? '',
-    password: hashPassword(body.password),
+    password: await hashPassword(body.password),
     profileImageId: body.profileImageId ?? '396fe4ce-aa36-4d96-b54e-6db40bae2eed',
     createdAt: now,
   });
@@ -82,7 +82,7 @@ router.post('/signin', async (c) => {
   if (user === undefined) {
     return c.json({ message: 'Bad Request' }, 400);
   }
-  if (!verifyPassword(body.password, user.password)) {
+  if (!await verifyPassword(body.password, user.password)) {
     return c.json({ message: 'Bad Request' }, 400);
   }
 
