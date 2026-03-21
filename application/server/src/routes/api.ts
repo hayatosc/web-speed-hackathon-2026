@@ -10,6 +10,7 @@ import { movieRouter } from "@web-speed-hackathon-2026/server/src/routes/api/mov
 import { postRouter } from "@web-speed-hackathon-2026/server/src/routes/api/post";
 import { searchRouter } from "@web-speed-hackathon-2026/server/src/routes/api/search";
 import { soundRouter } from "@web-speed-hackathon-2026/server/src/routes/api/sound";
+import { translateRouter } from "@web-speed-hackathon-2026/server/src/routes/api/translate";
 import { userRouter } from "@web-speed-hackathon-2026/server/src/routes/api/user";
 
 import type { NodeWebSocket } from "@hono/node-ws";
@@ -34,6 +35,7 @@ export function createApiRouter(upgradeWebSocket: NodeWebSocket["upgradeWebSocke
   router.route("/", movieRouter);
   router.route("/", imageRouter);
   router.route("/", soundRouter);
+  router.route("/", translateRouter);
   router.route("/", authRouter);
   router.route("/", crokRouter);
 
