@@ -1,8 +1,8 @@
 import analyze from "negaposi-analyzer-ja";
 
-import { getKuromojiTokenizer } from "@web-speed-hackathon-2026/client/src/utils/kuromoji_tokenizer";
+import { getKuromojiTokenizer } from "@web-speed-hackathon-2026/server/src/utils/kuromoji_tokenizer.js";
 
-type SentimentResult = {
+export type SentimentResult = {
   score: number;
   label: "positive" | "negative" | "neutral";
 };
@@ -10,7 +10,6 @@ type SentimentResult = {
 export async function analyzeSentiment(text: string): Promise<SentimentResult> {
   const tokenizer = await getKuromojiTokenizer();
   const tokens = tokenizer.tokenize(text);
-
   const score = analyze(tokens);
 
   let label: SentimentResult["label"];

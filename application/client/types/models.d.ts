@@ -77,6 +77,20 @@ declare namespace Models {
     content: string;
   }
 
+  interface Sentiment {
+    score: number;
+    label: "positive" | "negative" | "neutral";
+  }
+
+  interface SearchResponse {
+    posts: Array<Models.Post>;
+    sentiment: Models.Sentiment | null;
+  }
+
+  interface TranslationResponse {
+    result: string;
+  }
+
   interface SSEChunk {
     text?: string;
     done?: boolean;
