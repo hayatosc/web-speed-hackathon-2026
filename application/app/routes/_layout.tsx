@@ -1,8 +1,25 @@
 import { Fragment, Suspense, lazy, useCallback, useEffect, useId, useState } from "react";
-import { Outlet, useNavigate, useOutletContext, useLocation } from "react-router";
+import { Outlet, useLoaderData, useNavigate, useOutletContext, useLocation } from "react-router";
+import type { Route } from "./+types/_layout";
 
 import { AppPage } from "@web-speed-hackathon-2026/client/app/components/application/AppPage";
-import { fetchJSON, sendJSON } from "@web-speed-hackathon-2026/client/app/utils/fetchers";
+import { sendJSON } from "@web-speed-hackathon-2026/client/app/utils/fetchers";
+
+export async function loader({ request }: Route.LoaderArgs) {
+  const origin = new URL(request.url).origin;
+  const cookie = request.headers.get("cookie");
+  try {
+    const user = await fetch(`${origin}/api/v1/me`, {
+      headers: cookie ? { cookie } : {},
+    }).then((r) => {
+      if (!r.ok) return null;
+      return r.json() as Promise<Models.User>;
+    });
+    return { activeUser: user };
+  } catch {
+    return { activeUser: null };
+  }
+}
 
 const AuthModalContainer = lazy(() =>
   import("@web-speed-hackathon-2026/client/app/containers/AuthModalContainer").then((m) => ({ default: m.AuthModalContainer }))
@@ -22,6 +39,7 @@ export function useLayoutOutletContext(): LayoutOutletContext {
 }
 
 export default function Layout() {
+  const { activeUser: loaderUser } = useLoaderData<typeof loader>();
   const { pathname } = useLocation();
   const navigate = useNavigate();
 
@@ -33,16 +51,7 @@ export default function Layout() {
     window.scrollTo(0, 0);
   }, [pathname]);
 
-  const [activeUser, setActiveUser] = useState<Models.User | null>(null);
-  useEffect(() => {
-    void fetchJSON<Models.User>("/api/v1/me")
-      .then((user) => {
-        setActiveUser(user);
-      })
-      .catch(() => {
-        setActiveUser(null);
-      });
-  }, []);
+  const [activeUser, setActiveUser] = useState<Models.User | null>(loaderUser ?? null);
 
   const authModalId = useId();
   const newPostModalId = useId();
