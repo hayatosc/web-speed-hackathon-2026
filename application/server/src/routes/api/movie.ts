@@ -10,7 +10,7 @@ import { UPLOAD_PATH } from '@web-speed-hackathon-2026/server/src/paths';
 
 import type { HonoEnv } from '../../types';
 
-const EXTENSION = 'gif';
+const EXTENSION = 'webm';
 
 const router = new Hono<HonoEnv>();
 

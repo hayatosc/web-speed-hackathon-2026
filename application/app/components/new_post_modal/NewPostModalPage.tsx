@@ -124,13 +124,13 @@ export const NewPostModalPage = ({ id, hasError, isLoading, onResetError, onSubm
       void (async () => {
         try {
           const { convertMovie } = await loadMovieConverter();
-          const converted = await convertMovie(file, { extension: "gif", size: undefined });
+          const converted = await convertMovie(file, { extension: "webm", size: undefined });
 
           setParams((params) => ({
             ...params,
             images: [],
-            movie: new File([converted], "converted.gif", {
-              type: "image/gif",
+            movie: new File([converted], "converted.webm", {
+              type: "video/webm",
             }),
             sound: undefined,
           }));
@@ -181,7 +181,7 @@ export const NewPostModalPage = ({ id, hasError, isLoading, onResetError, onSubm
           onChange={handleChangeSound}
         />
         <AttachFileInputButton
-          accept="video/*"
+          accept="video/*,image/gif"
           active={params.movie !== undefined}
           icon={<FontAwesomeIcon iconType="video" styleType="solid" />}
           label="動画を添付"

@@ -9,7 +9,7 @@ export function getImageAvifPath(imageId: string): string {
 }
 
 export function getMoviePath(movieId: string): string {
-  return `/movies/${movieId}.gif`;
+  return `/movies/${movieId}.webm`;
 }
 
 export function getSoundPath(soundId: string): string {

@@ -1,21 +1,12 @@
 import classNames from "classnames";
-import { RefCallback, useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { AspectRatioBox } from "@web-speed-hackathon-2026/client/app/components/foundation/AspectRatioBox";
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/app/components/foundation/FontAwesomeIcon";
-import { useFetch } from "@web-speed-hackathon-2026/client/app/hooks/use_fetch";
 import { useNearScreen } from "@web-speed-hackathon-2026/client/app/hooks/use_near_screen";
-import { fetchBinary } from "@web-speed-hackathon-2026/client/app/utils/fetchers";
 
 interface Props {
   src: string;
-}
-
-interface MovieAnimator {
-  animateInCanvas: (canvas: HTMLCanvasElement) => void;
-  onFrame: (frame: unknown) => void;
-  start: () => void;
-  stop: () => void;
 }
 
 /**
@@ -23,94 +14,101 @@ interface MovieAnimator {
  */
 export const PausableMovie = ({ src }: Props) => {
   const { isNearScreen, ref: containerRef } = useNearScreen<HTMLDivElement>();
-  const { data, isLoading } = useFetch(isNearScreen ? src : "", fetchBinary);
-
-  const animatorRef = useRef<MovieAnimator | null>(null);
-  const canvasElementRef = useRef<HTMLCanvasElement | null>(null);
-  const canvasCallbackRef = useCallback<RefCallback<HTMLCanvasElement>>((el) => {
-    canvasElementRef.current = el;
-  }, []);
-
-  const [isPlaying, setIsPlaying] = useState(true);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false);
 
   useEffect(() => {
-    let isDisposed = false;
-    const canvas = canvasElementRef.current;
-    animatorRef.current?.stop();
-    animatorRef.current = null;
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const syncPreference = () => {
+      setPrefersReducedMotion(mediaQuery.matches);
+    };
 
-    if (canvas === null || data === null) {
+    syncPreference();
+    mediaQuery.addEventListener("change", syncPreference);
+    return () => {
+      mediaQuery.removeEventListener("change", syncPreference);
+    };
+  }, []);
+
+  const syncPlayback = useCallback(async (shouldPlay: boolean) => {
+    const video = videoRef.current;
+    if (video === null) {
       return;
     }
 
-    void Promise.all([import("gifler"), import("omggif")]).then(
-      ([{ Animator, Decoder }, { GifReader }]) => {
-        if (isDisposed || canvasElementRef.current !== canvas) {
-          return;
-        }
+    if (shouldPlay) {
+      try {
+        await video.play();
+        setIsPlaying(true);
+      } catch {
+        setIsPlaying(false);
+      }
+      return;
+    }
 
-        const reader = new GifReader(new Uint8Array(data));
-        const frames = Decoder.decodeFramesSync(reader);
-        const animator = new Animator(reader, frames) as MovieAnimator;
-        animator.animateInCanvas(canvas);
-        animator.onFrame(frames[0]!);
+    video.pause();
+    setIsPlaying(false);
+  }, []);
 
-        if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          setIsPlaying(false);
-          animator.stop();
-        } else {
-          setIsPlaying(true);
-          animator.start();
-        }
+  useEffect(() => {
+    if (isNearScreen !== true || isReady !== true) {
+      void syncPlayback(false);
+      return;
+    }
 
-        animatorRef.current = animator;
-      },
-    );
+    void syncPlayback(prefersReducedMotion !== true);
+  }, [isNearScreen, isReady, prefersReducedMotion, syncPlayback]);
 
-    return () => {
-      isDisposed = true;
-      animatorRef.current?.stop();
-      animatorRef.current = null;
-    };
-  }, [data]);
+  useEffect(() => {
+    setIsReady(false);
+  }, [src]);
 
   const handleClick = useCallback(() => {
-    setIsPlaying((isPlaying) => {
-      if (isPlaying) {
-        animatorRef.current?.stop();
-      } else {
-        animatorRef.current?.start();
-      }
-      return !isPlaying;
-    });
+    void syncPlayback(isPlaying !== true);
+  }, [isPlaying, syncPlayback]);
+
+  const handleLoadedMetadata = useCallback(() => {
+    setIsReady(true);
   }, []);
 
   return (
     <div ref={containerRef} className="h-full w-full">
       <AspectRatioBox aspectHeight={1} aspectWidth={1}>
-        {isLoading || data === null ? (
-          <div aria-hidden="true" className="bg-cax-surface-subtle h-full w-full" />
-        ) : (
-          <button
-            aria-label="動画プレイヤー"
-            className="group relative block h-full w-full"
-            onClick={handleClick}
-            type="button"
-            data-prevent-post-navigation="true"
+        <button
+          aria-label="動画プレイヤー"
+          className="group relative block h-full w-full"
+          onClick={handleClick}
+          type="button"
+          data-prevent-post-navigation="true"
+        >
+          {!isReady && <div aria-hidden="true" className="bg-cax-surface-subtle h-full w-full" />}
+          {isNearScreen ? (
+            <video
+              ref={videoRef}
+              className={classNames("absolute inset-0 h-full w-full object-cover", {
+                "opacity-0": isReady !== true,
+              })}
+              loop
+              muted
+              onLoadedMetadata={handleLoadedMetadata}
+              playsInline
+              preload="metadata"
+              src={src}
+            />
+          ) : null}
+          <div
+            className={classNames(
+              "absolute left-1/2 top-1/2 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-cax-overlay/50 text-3xl text-cax-surface-raised",
+              {
+                "opacity-0 group-hover:opacity-100": isPlaying,
+              },
+            )}
           >
-            <canvas ref={canvasCallbackRef} className="w-full" />
-            <div
-              className={classNames(
-                "absolute left-1/2 top-1/2 flex items-center justify-center w-16 h-16 text-cax-surface-raised text-3xl bg-cax-overlay/50 rounded-full -translate-x-1/2 -translate-y-1/2",
-                {
-                  "opacity-0 group-hover:opacity-100": isPlaying,
-                },
-              )}
-            >
-              <FontAwesomeIcon iconType={isPlaying ? "pause" : "play"} styleType="solid" />
-            </div>
-          </button>
-        )}
+            <FontAwesomeIcon iconType={isPlaying ? "pause" : "play"} styleType="solid" />
+          </div>
+        </button>
       </AspectRatioBox>
     </div>
   );

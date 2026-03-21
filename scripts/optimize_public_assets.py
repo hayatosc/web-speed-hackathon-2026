@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_DIR = ROOT / "application" / "public"
 IMAGES_DIR = PUBLIC_DIR / "images"
 PROFILE_IMAGES_DIR = IMAGES_DIR / "profiles"
+MOVIES_DIR = PUBLIC_DIR / "movies"
 FONTS_DIR = PUBLIC_DIR / "fonts"
 SERVER_SEEDS_DIR = ROOT / "application" / "server" / "seeds"
 TERM_PAGE_PATH = ROOT / "application" / "app" / "components" / "term" / "TermPage.tsx"
@@ -32,6 +33,15 @@ class ImageOptimizationPolicy:
 
 IMAGE_POLICY = ImageOptimizationPolicy(max_edge=2048, jpeg_quality=82, avif_quality=52)
 PROFILE_IMAGE_POLICY = ImageOptimizationPolicy(max_edge=512, jpeg_quality=84, avif_quality=58)
+
+
+@dataclass(frozen=True)
+class MovieOptimizationPolicy:
+    crf: int
+    cpu_used: int
+
+
+MOVIE_POLICY = MovieOptimizationPolicy(crf=34, cpu_used=4)
 
 
 def decode_alt(raw: object) -> str:
@@ -151,6 +161,60 @@ def optimize_image_directory(
     return before_total, after_total
 
 
+def find_ffmpeg() -> str:
+    ffmpeg_path = shutil.which("ffmpeg")
+    if ffmpeg_path is None:
+        raise RuntimeError("ffmpeg is required to optimize public movies")
+    return ffmpeg_path
+
+
+def optimize_movies(directory: Path, policy: MovieOptimizationPolicy) -> tuple[int, int]:
+    gif_paths = sorted(directory.glob("*.gif"))
+    webm_paths = sorted(directory.glob("*.webm"))
+    before_total = sum(path.stat().st_size for path in gif_paths)
+    ffmpeg = find_ffmpeg()
+
+    if len(gif_paths) == 0:
+        current_total = sum(path.stat().st_size for path in webm_paths)
+        return current_total, current_total
+
+    for path in gif_paths:
+        output_path = path.with_suffix(".webm")
+
+        with tempfile.TemporaryDirectory(dir=path.parent) as temp_dir_name:
+            temp_output_path = Path(temp_dir_name) / output_path.name
+            subprocess.run(
+                [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    str(path),
+                    "-an",
+                    "-c:v",
+                    "libvpx-vp9",
+                    "-b:v",
+                    "0",
+                    "-crf",
+                    str(policy.crf),
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-row-mt",
+                    "1",
+                    "-cpu-used",
+                    str(policy.cpu_used),
+                    str(temp_output_path),
+                ],
+                check=True,
+                cwd=ROOT,
+            )
+            temp_output_path.replace(output_path)
+
+        path.unlink()
+
+    after_total = sum(path.stat().st_size for path in sorted(directory.glob("*.webm")))
+    return before_total, after_total
+
+
 def write_public_asset_manifest() -> None:
     image_ids = sorted(path.stem for path in IMAGES_DIR.glob("*.avif"))
     profile_image_ids = sorted(path.stem for path in PROFILE_IMAGES_DIR.glob("*.avif"))
@@ -233,17 +297,19 @@ def main() -> None:
         PROFILE_IMAGE_POLICY,
         profile_image_alt_lookup,
     )
+    movie_before, movie_after = optimize_movies(MOVIES_DIR, MOVIE_POLICY)
     write_public_asset_manifest()
     font_before, font_after = optimize_fonts()
 
-    total_before = image_before + profile_before + font_before
-    total_after = image_after + profile_after + font_after
+    total_before = image_before + profile_before + movie_before + font_before
+    total_after = image_after + profile_after + movie_after + font_after
 
     print(
         "\n".join(
             [
                 f"images jpg fallback: {format_bytes(image_before)} -> {format_bytes(image_after)}",
                 f"profile images jpg fallback: {format_bytes(profile_before)} -> {format_bytes(profile_after)}",
+                f"movies gif source vs webm output: {format_bytes(movie_before)} -> {format_bytes(movie_after)}",
                 f"fonts (otf source size vs subset woff2): {format_bytes(font_before)} -> {format_bytes(font_after)}",
                 f"total fallback/source footprint: {format_bytes(total_before)} -> {format_bytes(total_after)}",
             ]

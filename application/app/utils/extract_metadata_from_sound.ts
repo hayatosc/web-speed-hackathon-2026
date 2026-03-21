@@ -1,6 +1,7 @@
 import Encoding from "encoding-japanese";
+import type { FFmpeg } from "@ffmpeg/ffmpeg";
 
-import { loadFFmpeg } from "@web-speed-hackathon-2026/client/app/utils/load_ffmpeg";
+import { withFFmpeg } from "@web-speed-hackathon-2026/client/app/utils/load_ffmpeg";
 
 interface SoundMetadata {
   artist: string;
@@ -11,19 +12,27 @@ interface SoundMetadata {
 const UNKNOWN_ARTIST = "Unknown Artist";
 const UNKNOWN_TITLE = "Unknown Title";
 
-export async function extractMetadataFromSound(data: File): Promise<SoundMetadata> {
+async function safeDeleteFile(ffmpeg: FFmpeg, filePath: string): Promise<void> {
   try {
-    const ffmpeg = await loadFFmpeg();
+    await ffmpeg.deleteFile(filePath);
+  } catch {
+    // Ignore cleanup failures for best-effort temp files.
+  }
+}
 
-    const exportFile = "meta.txt";
+async function extractMetadataFromSoundWithFFmpeg(
+  data: File,
+  ffmpeg: FFmpeg,
+): Promise<SoundMetadata> {
+  const jobId = crypto.randomUUID();
+  const inputFile = `${jobId}-sound`;
+  const exportFile = `${jobId}-meta.txt`;
 
-    await ffmpeg.writeFile("file", new Uint8Array(await data.arrayBuffer()));
-
-    await ffmpeg.exec(["-i", "file", "-f", "ffmetadata", exportFile]);
+  try {
+    await ffmpeg.writeFile(inputFile, new Uint8Array(await data.arrayBuffer()));
+    await ffmpeg.exec(["-i", inputFile, "-f", "ffmetadata", exportFile]);
 
     const output = (await ffmpeg.readFile(exportFile)) as Uint8Array<ArrayBuffer>;
-
-    ffmpeg.terminate();
 
     const outputUtf8 = Encoding.convert(output, {
       to: "UNICODE",
@@ -42,7 +51,17 @@ export async function extractMetadataFromSound(data: File): Promise<SoundMetadat
       artist: UNKNOWN_ARTIST,
       title: UNKNOWN_TITLE,
     };
+  } finally {
+    await Promise.all([safeDeleteFile(ffmpeg, inputFile), safeDeleteFile(ffmpeg, exportFile)]);
   }
+}
+
+export async function extractMetadataFromSound(data: File, ffmpeg?: FFmpeg): Promise<SoundMetadata> {
+  if (ffmpeg !== undefined) {
+    return extractMetadataFromSoundWithFFmpeg(data, ffmpeg);
+  }
+
+  return withFFmpeg(async (sharedFFmpeg) => extractMetadataFromSoundWithFFmpeg(data, sharedFFmpeg));
 }
 
 function parseFFmetadata(ffmetadata: string): Partial<SoundMetadata> {
