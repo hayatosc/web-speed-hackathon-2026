@@ -1,1 +1,0 @@
-import{o as e}from"./chunk-1p1EYVQ2.js";import{t}from"./react-BMWhuGU6.js";import{r as n}from"./chunk-OIYGIGL5-DDDOLv3B.js";import{t as r}from"./jsx-runtime-P6oPgn4Y.js";var i=e(t(),1),a=r(),o=(0,i.forwardRef)(({prefetch:e=`intent`,...t},r)=>(0,a.jsx)(n,{ref:r,prefetch:e,...t}));o.displayName=`Link`;export{o as t};

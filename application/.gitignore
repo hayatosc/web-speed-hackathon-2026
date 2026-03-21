@@ -103,6 +103,9 @@ web_modules/
 # Optional npm cache directory
 .npm
 
+# Application build output
+build/
+
 # Optional eslint cache
 .eslintcache
 
