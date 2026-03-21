@@ -698,6 +698,10 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
       throw new HTTPException(404);
     }
 
+    if (conversation.initiatorId !== userId && conversation.memberId !== userId) {
+      throw new HTTPException(403);
+    }
+
     eventhub.emit(`dm:conversation/${conversation.id}:typing/${userId}`, {});
 
     return c.json({});
