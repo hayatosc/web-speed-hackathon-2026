@@ -111,6 +111,37 @@ function formatConversation(conv: {
   };
 }
 
+function formatConversationLite(conv: {
+  id: string;
+  initiator: {
+    id: string;
+    username: string;
+    name: string;
+    description: string;
+    password: string;
+    profileImageId: string;
+    createdAt: string;
+    profileImage: { id: string; alt: string } | null;
+  };
+  member: {
+    id: string;
+    username: string;
+    name: string;
+    description: string;
+    password: string;
+    profileImageId: string;
+    createdAt: string;
+    profileImage: { id: string; alt: string } | null;
+  };
+}) {
+  return {
+    id: conv.id,
+    initiator: formatUser(conv.initiator),
+    member: formatUser(conv.member),
+    messages: [],
+  };
+}
+
 function formatConversationSummary(conv: {
   id: string;
   initiator: {
@@ -319,6 +350,7 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
 
     const body = await c.req.json();
     const peerId = body?.peerId;
+    const includeMessages = c.req.query("includeMessages") !== "0";
 
     const peer = await db.query.users.findFirst({
       where: eq(schema.users.id, peerId),
@@ -327,7 +359,84 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
       throw new HTTPException(404);
     }
 
-    // FindOrCreate semantics with conflict-safe logic
+    if (includeMessages) {
+      let conversation = await db.query.directMessageConversations.findFirst({
+        where: or(
+          and(
+            eq(schema.directMessageConversations.initiatorId, userId),
+            eq(schema.directMessageConversations.memberId, peerId),
+          ),
+          and(
+            eq(schema.directMessageConversations.initiatorId, peerId),
+            eq(schema.directMessageConversations.memberId, userId),
+          ),
+        ),
+        with: {
+          initiator: {
+            with: {
+              profileImage: true,
+            },
+          },
+          member: {
+            with: {
+              profileImage: true,
+            },
+          },
+          messages: {
+            with: {
+              sender: {
+                with: {
+                  profileImage: true,
+                },
+              },
+            },
+            orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+          },
+        },
+      });
+
+      if (!conversation) {
+        const conversationId = uuidv4();
+        await db.insert(schema.directMessageConversations).values({
+          id: conversationId,
+          initiatorId: userId,
+          memberId: peerId,
+        });
+
+        conversation = await db.query.directMessageConversations.findFirst({
+          where: eq(schema.directMessageConversations.id, conversationId),
+          with: {
+            initiator: {
+              with: {
+                profileImage: true,
+              },
+            },
+            member: {
+              with: {
+                profileImage: true,
+              },
+            },
+            messages: {
+              with: {
+                sender: {
+                  with: {
+                    profileImage: true,
+                  },
+                },
+              },
+              orderBy: (messages, { asc }) => [asc(messages.createdAt)],
+            },
+          },
+        });
+      }
+
+      if (conversation === undefined) {
+        throw new HTTPException(500);
+      }
+
+      return c.json(formatConversation(conversation));
+    }
+
     let conversation = await db.query.directMessageConversations.findFirst({
       where: or(
         and(
@@ -349,16 +458,6 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
           with: {
             profileImage: true,
           },
-        },
-        messages: {
-          with: {
-            sender: {
-              with: {
-                profileImage: true,
-              },
-            },
-          },
-          orderBy: (messages, { asc }) => [asc(messages.createdAt)],
         },
       },
     });
@@ -384,16 +483,6 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
               profileImage: true,
             },
           },
-          messages: {
-            with: {
-              sender: {
-                with: {
-                  profileImage: true,
-                },
-              },
-            },
-            orderBy: (messages, { asc }) => [asc(messages.createdAt)],
-          },
         },
       });
     }
@@ -401,7 +490,8 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
     if (conversation === undefined) {
       throw new HTTPException(500);
     }
-    return c.json(formatConversation(conversation));
+
+    return c.json(formatConversationLite(conversation));
   });
 
   router.get(

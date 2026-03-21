@@ -17,10 +17,18 @@ let _sqlite: Database.Database | null = null;
 
 function ensureIndexes(sqlite: Database.Database): void {
   sqlite.exec(`
+    CREATE INDEX IF NOT EXISTS "idx_posts_user_id_id"
+      ON "Posts" ("userId", "id");
+    CREATE INDEX IF NOT EXISTS "idx_comments_post_id_created_at"
+      ON "Comments" ("postId", "createdAt");
     CREATE INDEX IF NOT EXISTS "idx_direct_message_conversations_initiator_id"
       ON "DirectMessageConversations" ("initiatorId");
     CREATE INDEX IF NOT EXISTS "idx_direct_message_conversations_member_id"
       ON "DirectMessageConversations" ("memberId");
+    CREATE INDEX IF NOT EXISTS "idx_direct_message_conversations_initiator_member"
+      ON "DirectMessageConversations" ("initiatorId", "memberId");
+    CREATE INDEX IF NOT EXISTS "idx_direct_message_conversations_member_initiator"
+      ON "DirectMessageConversations" ("memberId", "initiatorId");
     CREATE INDEX IF NOT EXISTS "idx_direct_messages_conversation_created_at"
       ON "DirectMessages" ("conversationId", "createdAt");
     CREATE INDEX IF NOT EXISTS "idx_direct_messages_conversation_sender_is_read"

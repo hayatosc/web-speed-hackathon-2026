@@ -75,90 +75,45 @@ router.get("/search", async (c) => {
   if (sinceDate) dateConditions.push(gte(schema.posts.createdAt, sinceDate.toISOString()));
   if (untilDate) dateConditions.push(lte(schema.posts.createdAt, untilDate.toISOString()));
 
-  // Search by text
-  const textConditions = searchTerm
-    ? [like(schema.posts.text, searchTerm), ...dateConditions]
-    : dateConditions;
-
-  const postsByText =
-    textConditions.length > 0
-      ? await db.query.posts.findMany({
-          where: textConditions.length === 1 ? textConditions[0] : and(...textConditions),
-          with: {
-            user: {
-              with: {
-                profileImage: true,
-              },
-            },
-            movie: true,
-            sound: true,
-            postImages: {
-              with: {
-                image: true,
-              },
-            },
-          },
-          orderBy: [desc(schema.posts.id)],
-          limit,
-          offset,
-        })
-      : [];
-
-  // Search by username/name
-  let postsByUser: typeof postsByText = [];
+  let searchCondition: ReturnType<typeof or> | ReturnType<typeof like> | undefined;
   if (searchTerm) {
-    // Get users matching the search term
     const matchingUsers = await db.query.users.findMany({
       where: or(like(schema.users.username, searchTerm), like(schema.users.name, searchTerm)),
       columns: { id: true },
     });
+    const userIds = matchingUsers.map((user) => user.id);
 
-    const userIds = matchingUsers.map((u) => u.id);
+    searchCondition =
+      userIds.length > 0
+        ? or(like(schema.posts.text, searchTerm), inArray(schema.posts.userId, userIds))
+        : like(schema.posts.text, searchTerm);
+  }
 
-    if (userIds.length > 0) {
-      const userConditions = and(
-        inArray(schema.posts.userId, userIds),
-        ...(dateConditions.length > 0 ? dateConditions : []),
-      );
+  const where =
+    searchCondition != null && dateConditions.length > 0
+      ? and(searchCondition, ...dateConditions)
+      : searchCondition ?? (dateConditions.length === 1 ? dateConditions[0] : and(...dateConditions));
 
-      postsByUser = await db.query.posts.findMany({
-        where: userConditions,
+  const result = await db.query.posts.findMany({
+    where,
+    with: {
+      user: {
         with: {
-          user: {
-            with: {
-              profileImage: true,
-            },
-          },
-          movie: true,
-          sound: true,
-          postImages: {
-            with: {
-              image: true,
-            },
-          },
+          profileImage: true,
         },
-        orderBy: [desc(schema.posts.id)],
-        limit,
-        offset,
-      });
-    }
-  }
-
-  // Merge and deduplicate results
-  const postIdSet = new Set<string>();
-  const mergedPosts: typeof postsByText = [];
-  for (const post of [...postsByText, ...postsByUser]) {
-    if (!postIdSet.has(post.id)) {
-      postIdSet.add(post.id);
-      mergedPosts.push(post);
-    }
-  }
-
-  // Sort by createdAt descending
-  mergedPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-  // Apply pagination
-  const result = mergedPosts.slice(offset || 0, (offset || 0) + (limit || mergedPosts.length));
+      },
+      movie: true,
+      sound: true,
+      postImages: {
+        with: {
+          image: true,
+        },
+      },
+    },
+    orderBy: [desc(schema.posts.createdAt), desc(schema.posts.id)],
+    limit,
+    offset,
+  });
 
   return c.json(result.map(formatPost));
 });

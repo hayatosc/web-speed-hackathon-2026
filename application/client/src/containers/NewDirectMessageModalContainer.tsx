@@ -33,9 +33,12 @@ export const NewDirectMessageModalContainer = ({ id }: Props) => {
     async (values: NewDirectMessageFormData) => {
       try {
         const user = await fetchJSON<Models.User>(`/api/v1/users/${values.username}`);
-        const conversation = await sendJSON<Models.DirectMessageConversation>(`/api/v1/dm`, {
-          peerId: user.id,
-        });
+        const conversation = await sendJSON<Pick<Models.DirectMessageConversation, "id">>(
+          `/api/v1/dm?includeMessages=0`,
+          {
+            peerId: user.id,
+          },
+        );
         navigate(`/dm/${conversation.id}`);
       } catch {
         throw new SubmissionError({

@@ -1,5 +1,3 @@
-import { Buffer } from "buffer";
-import { load, ImageIFD } from "piexifjs";
 import { MouseEvent, useCallback, useId, useState } from "react";
 
 import { Button } from "@web-speed-hackathon-2026/client/src/components/foundation/Button";
@@ -16,6 +14,7 @@ async function loadImageDescription(src: string): Promise<string> {
   }
 
   const data = await res.arrayBuffer();
+  const [{ Buffer }, { ImageIFD, load }] = await Promise.all([import("buffer"), import("piexifjs")]);
   const exif = load(Buffer.from(data).toString("binary"));
   const raw = exif?.["0th"]?.[ImageIFD.ImageDescription];
   return raw != null ? new TextDecoder().decode(Buffer.from(raw, "binary")) : "";
