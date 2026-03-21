@@ -1,6 +1,11 @@
 import { useState } from "react";
 
-import { getProfileImagePath } from "@web-speed-hackathon-2026/client/app/utils/get_path";
+import { OptimizedImage } from "@web-speed-hackathon-2026/client/app/components/foundation/OptimizedImage";
+import {
+  getProfileImageAvifPath,
+  getProfileImagePath,
+  hasProfileImageAvifAsset,
+} from "@web-speed-hackathon-2026/client/app/utils/get_path";
 
 interface Props {
   user: Models.User;
@@ -37,11 +42,16 @@ export const AccountMenu = ({ user, onLogout }: Props) => {
         className="hover:bg-cax-surface-subtle flex w-full items-center gap-3 rounded-full p-2 transition-colors"
         onClick={() => setOpen((prev) => !prev)}
       >
-        <img
+        <OptimizedImage
           alt={user.profileImage.alt}
+          avifSrc={
+            hasProfileImageAvifAsset(user.profileImage.id)
+              ? getProfileImageAvifPath(user.profileImage.id)
+              : undefined
+          }
           className="h-10 w-10 shrink-0 rounded-full object-cover"
+          fallbackSrc={getProfileImagePath(user.profileImage.id)}
           height={user.profileImage.height}
-          src={getProfileImagePath(user.profileImage.id)}
           width={user.profileImage.width}
         />
         <div className="hidden min-w-0 flex-1 text-left lg:block">

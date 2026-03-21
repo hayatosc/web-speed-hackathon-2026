@@ -335,10 +335,19 @@ paths:
                 type: object
                 required:
                   - id
+                  - alt
+                  - width
+                  - height
                 properties:
                   id:
                     type: string
                     format: uuid
+                  alt:
+                    type: string
+                  width:
+                    type: integer
+                  height:
+                    type: integer
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -405,6 +414,8 @@ paths:
                   - id
                   - artist
                   - title
+                  - durationMs
+                  - waveformPeaks
                 properties:
                   id:
                     type: string
@@ -413,6 +424,12 @@ paths:
                     type: string
                   title:
                     type: string
+                  durationMs:
+                    type: integer
+                  waveformPeaks:
+                    type: array
+                    items:
+                      type: number
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -817,13 +834,17 @@ components:
   schemas:
     ProfileImage:
       type: object
-      required: [id, alt]
+      required: [id, alt, width, height]
       properties:
         id:
           type: string
           format: uuid
         alt:
           type: string
+        width:
+          type: integer
+        height:
+          type: integer
 
     User:
       type: object
@@ -846,13 +867,17 @@ components:
 
     Image:
       type: object
-      required: [id, alt]
+      required: [id, alt, width, height]
       properties:
         id:
           type: string
           format: uuid
         alt:
           type: string
+        width:
+          type: integer
+        height:
+          type: integer
 
     Movie:
       type: object
@@ -864,7 +889,7 @@ components:
 
     Sound:
       type: object
-      required: [id, title, artist]
+      required: [id, title, artist, durationMs, waveformPeaks]
       properties:
         id:
           type: string
@@ -873,6 +898,12 @@ components:
           type: string
         artist:
           type: string
+        durationMs:
+          type: integer
+        waveformPeaks:
+          type: array
+          items:
+            type: number
 
     Post:
       type: object

@@ -96,7 +96,7 @@ router.post('/signin', async (c) => {
   if (user === undefined) {
     return c.json({ message: 'Bad Request' }, 400);
   }
-  if (!await verifyPassword(body.password, user.password)) {
+  if (!(await verifyPassword(body.password, user.password))) {
     return c.json({ message: 'Bad Request' }, 400);
   }
 

@@ -1,7 +1,12 @@
 import { Button } from "@web-speed-hackathon-2026/client/app/components/foundation/Button";
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/app/components/foundation/FontAwesomeIcon";
 import { Link } from "@web-speed-hackathon-2026/client/app/components/foundation/Link";
-import { getProfileImagePath } from "@web-speed-hackathon-2026/client/app/utils/get_path";
+import { OptimizedImage } from "@web-speed-hackathon-2026/client/app/components/foundation/OptimizedImage";
+import {
+  getProfileImageAvifPath,
+  getProfileImagePath,
+  hasProfileImageAvifAsset,
+} from "@web-speed-hackathon-2026/client/app/utils/get_path";
 
 const relativeTimeFormatter = new Intl.RelativeTimeFormat("ja", { numeric: "auto" });
 
@@ -85,11 +90,16 @@ export const DirectMessageListPage = ({ activeUser, conversations, error, newDmM
               <li className="grid" key={conversation.id}>
                 <Link className="hover:bg-cax-surface-subtle px-4" to={`/dm/${conversation.id}`}>
                   <div className="border-cax-border flex gap-4 border-b px-4 pt-2 pb-4">
-                    <img
+                    <OptimizedImage
                       alt={peer.profileImage.alt}
+                      avifSrc={
+                        hasProfileImageAvifAsset(peer.profileImage.id)
+                          ? getProfileImageAvifPath(peer.profileImage.id)
+                          : undefined
+                      }
                       className="w-12 shrink-0 self-start rounded-full"
+                      fallbackSrc={getProfileImagePath(peer.profileImage.id)}
                       height={peer.profileImage.height}
-                      src={getProfileImagePath(peer.profileImage.id)}
                       width={peer.profileImage.width}
                     />
                     <div className="flex flex-1 flex-col">

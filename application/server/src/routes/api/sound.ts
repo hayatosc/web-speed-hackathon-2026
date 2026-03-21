@@ -7,7 +7,7 @@ import { HTTPException } from 'hono/http-exception';
 import { randomUUID } from 'node:crypto';
 
 import { UPLOAD_PATH } from '@web-speed-hackathon-2026/server/src/paths';
-import { extractMetadataFromSound } from '@web-speed-hackathon-2026/server/src/utils/extract_metadata_from_sound';
+import { extractSoundDetails } from '@web-speed-hackathon-2026/server/src/utils/media_metadata';
 
 import type { HonoEnv } from '../../types';
 
@@ -31,12 +31,12 @@ router.post('/sounds', async (c) => {
   }
 
   const soundId = randomUUID();
-  const { artist, title } = await extractMetadataFromSound(buffer);
+  const { artist, durationMs, title, waveformPeaks } = await extractSoundDetails(buffer);
   const filePath = path.resolve(UPLOAD_PATH, `./sounds/${soundId}.${EXTENSION}`);
   await fs.mkdir(path.resolve(UPLOAD_PATH, 'sounds'), { recursive: true });
   await fs.writeFile(filePath, buffer);
 
-  return c.json({ artist, id: soundId, title });
+  return c.json({ artist, durationMs, id: soundId, title, waveformPeaks });
 });
 
 export { router as soundRouter };

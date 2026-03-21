@@ -2,7 +2,11 @@ import classNames from "classnames";
 
 import { AspectRatioBox } from "@web-speed-hackathon-2026/client/app/components/foundation/AspectRatioBox";
 import { CoveredImage } from "@web-speed-hackathon-2026/client/app/components/foundation/CoveredImage";
-import { getImagePath } from "@web-speed-hackathon-2026/client/app/utils/get_path";
+import {
+  getImageAvifPath,
+  getImagePath,
+  hasImageAvifAsset,
+} from "@web-speed-hackathon-2026/client/app/utils/get_path";
 
 interface Props {
   images: Models.Image[];
@@ -26,6 +30,7 @@ export const ImageArea = ({ images }: Props) => {
             >
               <CoveredImage
                 alt={image.alt}
+                avifSrc={hasImageAvifAsset(image.id) ? getImageAvifPath(image.id) : undefined}
                 height={image.height}
                 src={getImagePath(image.id)}
                 width={image.width}

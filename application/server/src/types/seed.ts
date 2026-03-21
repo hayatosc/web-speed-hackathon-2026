@@ -4,6 +4,8 @@
 export interface ProfileImageSeed {
   id: string;
   alt: string;
+  width: number;
+  height: number;
 }
 
 export interface UserSeed {
@@ -20,6 +22,8 @@ export interface ImageSeed {
   id: string;
   alt: string;
   createdAt: string;
+  width: number;
+  height: number;
 }
 
 export interface MovieSeed {
@@ -30,6 +34,8 @@ export interface SoundSeed {
   id: string;
   title: string;
   artist: string;
+  durationMs: number;
+  waveformPeaks: number[];
 }
 
 export interface PostSeed {

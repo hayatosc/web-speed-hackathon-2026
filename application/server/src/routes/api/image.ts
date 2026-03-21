@@ -7,6 +7,7 @@ import { HTTPException } from 'hono/http-exception';
 import { randomUUID } from 'node:crypto';
 
 import { UPLOAD_PATH } from '@web-speed-hackathon-2026/server/src/paths';
+import { extractImageDetails } from '@web-speed-hackathon-2026/server/src/utils/media_metadata';
 
 import type { HonoEnv } from '../../types';
 
@@ -30,11 +31,12 @@ router.post('/images', async (c) => {
   }
 
   const imageId = randomUUID();
+  const { alt, height, width } = extractImageDetails(buffer);
   const filePath = path.resolve(UPLOAD_PATH, `./images/${imageId}.${EXTENSION}`);
   await fs.mkdir(path.resolve(UPLOAD_PATH, 'images'), { recursive: true });
   await fs.writeFile(filePath, buffer);
 
-  return c.json({ id: imageId });
+  return c.json({ alt, height, id: imageId, width });
 });
 
 export { router as imageRouter };

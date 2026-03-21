@@ -1,7 +1,12 @@
 import { Link } from "@web-speed-hackathon-2026/client/app/components/foundation/Link";
+import { OptimizedImage } from "@web-speed-hackathon-2026/client/app/components/foundation/OptimizedImage";
 import { TranslatableText } from "@web-speed-hackathon-2026/client/app/components/post/TranslatableText";
 import { formatLongDate, toISOString } from "@web-speed-hackathon-2026/client/app/utils/format_long_date";
-import { getProfileImagePath } from "@web-speed-hackathon-2026/client/app/utils/get_path";
+import {
+  getProfileImageAvifPath,
+  getProfileImagePath,
+  hasProfileImageAvifAsset,
+} from "@web-speed-hackathon-2026/client/app/utils/get_path";
 
 interface Props {
   comment: Models.Comment;
@@ -16,10 +21,15 @@ export const CommentItem = ({ comment }: Props) => {
             className="border-cax-border bg-cax-surface-subtle block h-8 w-8 overflow-hidden rounded-full border hover:opacity-75 sm:h-12 sm:w-12"
             to={`/users/${comment.user.username}`}
           >
-            <img
+            <OptimizedImage
               alt={comment.user.profileImage.alt}
+              avifSrc={
+                hasProfileImageAvifAsset(comment.user.profileImage.id)
+                  ? getProfileImageAvifPath(comment.user.profileImage.id)
+                  : undefined
+              }
+              fallbackSrc={getProfileImagePath(comment.user.profileImage.id)}
               height={comment.user.profileImage.height}
-              src={getProfileImagePath(comment.user.profileImage.id)}
               width={comment.user.profileImage.width}
             />
           </Link>

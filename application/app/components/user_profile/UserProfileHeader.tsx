@@ -2,8 +2,13 @@ import { FastAverageColor } from "fast-average-color";
 import { ReactEventHandler, useCallback, useEffect, useRef, useState } from "react";
 
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/app/components/foundation/FontAwesomeIcon";
+import { OptimizedImage } from "@web-speed-hackathon-2026/client/app/components/foundation/OptimizedImage";
 import { formatLongDate, toISOString } from "@web-speed-hackathon-2026/client/app/utils/format_long_date";
-import { getProfileImagePath } from "@web-speed-hackathon-2026/client/app/utils/get_path";
+import {
+  getProfileImageAvifPath,
+  getProfileImagePath,
+  hasProfileImageAvifAsset,
+} from "@web-speed-hackathon-2026/client/app/utils/get_path";
 
 interface Props {
   user: Models.User;
@@ -49,12 +54,17 @@ export const UserProfileHeader = ({ user }: Props) => {
         style={averageColor ? { backgroundColor: averageColor } : undefined}
       ></div>
       <div className="border-cax-border bg-cax-surface-subtle absolute left-2/4 m-0 h-28 w-28 -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-full border sm:h-32 sm:w-32">
-        <img
+        <OptimizedImage
           alt=""
+          avifSrc={
+            hasProfileImageAvifAsset(user.profileImage.id)
+              ? getProfileImageAvifPath(user.profileImage.id)
+              : undefined
+          }
+          fallbackSrc={getProfileImagePath(user.profileImage.id)}
           height={user.profileImage.height}
           onLoad={handleLoadImage}
           ref={imageRef}
-          src={getProfileImagePath(user.profileImage.id)}
           width={user.profileImage.width}
         />
       </div>

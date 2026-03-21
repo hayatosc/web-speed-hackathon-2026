@@ -16,7 +16,9 @@ const db = drizzle(sqlite, { schema });
 db.run(sql`
   CREATE TABLE IF NOT EXISTS "ProfileImages" (
     "id" TEXT PRIMARY KEY NOT NULL,
-    "alt" TEXT NOT NULL DEFAULT ''
+    "alt" TEXT NOT NULL DEFAULT '',
+    "width" INTEGER NOT NULL,
+    "height" INTEGER NOT NULL
   )
 `);
 
@@ -36,7 +38,9 @@ db.run(sql`
   CREATE TABLE IF NOT EXISTS "Images" (
     "id" TEXT PRIMARY KEY NOT NULL,
     "alt" TEXT NOT NULL DEFAULT '',
-    "createdAt" TEXT NOT NULL
+    "createdAt" TEXT NOT NULL,
+    "width" INTEGER NOT NULL,
+    "height" INTEGER NOT NULL
   )
 `);
 
@@ -50,7 +54,9 @@ db.run(sql`
   CREATE TABLE IF NOT EXISTS "Sounds" (
     "id" TEXT PRIMARY KEY NOT NULL,
     "title" TEXT NOT NULL DEFAULT 'Unknown',
-    "artist" TEXT NOT NULL DEFAULT 'Unknown'
+    "artist" TEXT NOT NULL DEFAULT 'Unknown',
+    "durationMs" INTEGER NOT NULL,
+    "waveformPeaks" TEXT NOT NULL DEFAULT '[]'
   )
 `);
 

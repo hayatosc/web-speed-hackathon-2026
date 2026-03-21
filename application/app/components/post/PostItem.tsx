@@ -1,10 +1,15 @@
 import { Link } from "@web-speed-hackathon-2026/client/app/components/foundation/Link";
+import { OptimizedImage } from "@web-speed-hackathon-2026/client/app/components/foundation/OptimizedImage";
 import { ImageArea } from "@web-speed-hackathon-2026/client/app/components/post/ImageArea";
 import { MovieArea } from "@web-speed-hackathon-2026/client/app/components/post/MovieArea";
 import { SoundArea } from "@web-speed-hackathon-2026/client/app/components/post/SoundArea";
 import { TranslatableText } from "@web-speed-hackathon-2026/client/app/components/post/TranslatableText";
 import { formatLongDate, toISOString } from "@web-speed-hackathon-2026/client/app/utils/format_long_date";
-import { getProfileImagePath } from "@web-speed-hackathon-2026/client/app/utils/get_path";
+import {
+  getProfileImageAvifPath,
+  getProfileImagePath,
+  hasProfileImageAvifAsset,
+} from "@web-speed-hackathon-2026/client/app/utils/get_path";
 
 interface Props {
   post: Models.Post;
@@ -20,10 +25,15 @@ export const PostItem = ({ post }: Props) => {
               className="border-cax-border bg-cax-surface-subtle block h-14 w-14 overflow-hidden rounded-full border hover:opacity-95 sm:h-16 sm:w-16"
               to={`/users/${post.user.username}`}
             >
-              <img
+              <OptimizedImage
                 alt={post.user.profileImage.alt}
+                avifSrc={
+                  hasProfileImageAvifAsset(post.user.profileImage.id)
+                    ? getProfileImageAvifPath(post.user.profileImage.id)
+                    : undefined
+                }
+                fallbackSrc={getProfileImagePath(post.user.profileImage.id)}
                 height={post.user.profileImage.height}
-                src={getProfileImagePath(post.user.profileImage.id)}
                 width={post.user.profileImage.width}
               />
             </Link>

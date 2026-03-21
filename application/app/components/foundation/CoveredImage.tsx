@@ -2,9 +2,11 @@ import { MouseEvent, useCallback, useId } from "react";
 
 import { Button } from "@web-speed-hackathon-2026/client/app/components/foundation/Button";
 import { Modal } from "@web-speed-hackathon-2026/client/app/components/modal/Modal";
+import { OptimizedImage } from "@web-speed-hackathon-2026/client/app/components/foundation/OptimizedImage";
 
 interface Props {
   alt: string;
+  avifSrc?: string;
   height: number;
   loading?: "eager" | "lazy";
   sizes?: string;
@@ -16,7 +18,16 @@ interface Props {
 /**
  * アスペクト比を維持したまま、要素のコンテンツボックス全体を埋めるように画像を拡大縮小します
  */
-export const CoveredImage = ({ alt, height, loading = "eager", sizes, src, srcSet, width }: Props) => {
+export const CoveredImage = ({
+  alt,
+  avifSrc,
+  height,
+  loading = "eager",
+  sizes,
+  src,
+  srcSet,
+  width,
+}: Props) => {
   const dialogId = useId();
 
   // ダイアログの背景をクリックしたときに投稿詳細ページに遷移しないようにする
@@ -26,13 +37,14 @@ export const CoveredImage = ({ alt, height, loading = "eager", sizes, src, srcSe
 
   return (
     <div className="relative h-full w-full overflow-hidden">
-      <img
+      <OptimizedImage
         alt={alt}
+        avifSrc={avifSrc}
         className="h-full w-full"
         decoding="async"
+        fallbackSrc={src}
         height={height}
         loading={loading}
-        src={src}
         srcSet={srcSet}
         sizes={sizes}
         style={{ inset: 0, objectFit: "cover", position: "absolute" }}
