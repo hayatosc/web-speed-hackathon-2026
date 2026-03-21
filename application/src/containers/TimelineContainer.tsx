@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-
+import { DocumentTitle } from "@web-speed-hackathon-2026/client/src/components/foundation/DocumentTitle";
 import { InfiniteScroll } from "@web-speed-hackathon-2026/client/src/components/foundation/InfiniteScroll";
 import { TimelinePage } from "@web-speed-hackathon-2026/client/src/components/timeline/TimelinePage";
 import { useInfiniteFetch } from "@web-speed-hackathon-2026/client/src/hooks/use_infinite_fetch";
@@ -12,12 +11,10 @@ export const TimelineContainer = ({ initialPosts }: { initialPosts?: Models.Post
     initialPosts,
   );
 
-  useEffect(() => {
-    void import("@web-speed-hackathon-2026/client/src/containers/PostContainer");
-  }, []);
-
   return (
-    <InfiniteScroll fetchMore={fetchMore} items={posts}>      <TimelinePage timeline={posts} />
+    <InfiniteScroll fetchMore={fetchMore} items={posts}>
+      <DocumentTitle title="タイムライン - CaX" />
+      <TimelinePage timeline={posts} />
     </InfiniteScroll>
   );
 };

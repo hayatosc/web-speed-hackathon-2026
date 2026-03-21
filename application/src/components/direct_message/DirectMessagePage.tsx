@@ -12,8 +12,13 @@ import {
 
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/src/components/foundation/FontAwesomeIcon";
 import { DirectMessageFormData } from "@web-speed-hackathon-2026/client/src/direct_message/types";
-import { formatShortTime, toISOString } from "@web-speed-hackathon-2026/client/src/utils/format_long_date";
 import { getProfileImagePath } from "@web-speed-hackathon-2026/client/src/utils/get_path";
+
+const dmTimeFormatter = new Intl.DateTimeFormat("ja-JP", {
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
 
 interface Props {
   conversationError: Error | null;
@@ -43,7 +48,7 @@ export const DirectMessagePage = ({
   const [text, setText] = useState("");
   const textAreaRows = Math.min((text || "").split("\n").length, 5);
   const isInvalid = text.trim().length === 0;
-  const scrollHeightRef = useRef(0);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   const handleChange = useCallback(
     (event: ChangeEvent<HTMLTextAreaElement>) => {
@@ -74,16 +79,17 @@ export const DirectMessagePage = ({
   );
 
   useEffect(() => {
-    const id = setInterval(() => {
-      const height = Number(window.getComputedStyle(document.body).height.replace("px", ""));
-      if (height !== scrollHeightRef.current) {
-        scrollHeightRef.current = height;
-        window.scrollTo(0, height);
+    const frameId = window.requestAnimationFrame(() => {
+      const container = messagesContainerRef.current;
+      if (container !== null) {
+        container.scrollTop = container.scrollHeight;
       }
-    }, 1);
+    });
 
-    return () => clearInterval(id);
-  }, []);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [conversation.id, conversation.messages.length]);
 
   if (conversationError != null) {
     return (
@@ -99,7 +105,9 @@ export const DirectMessagePage = ({
         <img
           alt={peer.profileImage.alt}
           className="h-12 w-12 rounded-full object-cover"
+          height={48}
           src={getProfileImagePath(peer.profileImage.id)}
+          width={48}
         />
         <div className="min-w-0">
           <h1 className="overflow-hidden text-xl font-bold text-ellipsis whitespace-nowrap">
@@ -111,7 +119,10 @@ export const DirectMessagePage = ({
         </div>
       </header>
 
-      <div className="bg-cax-surface-subtle flex-1 space-y-4 overflow-y-auto px-4 pt-4 pb-8">
+      <div
+        ref={messagesContainerRef}
+        className="bg-cax-surface-subtle flex-1 space-y-4 overflow-y-auto px-4 pt-4 pb-8"
+      >
         {conversation.messages.length === 0 && (
           <p className="text-cax-text-muted text-center text-sm">
             まだメッセージはありません。最初のメッセージを送信してみましょう。
@@ -124,6 +135,7 @@ export const DirectMessagePage = ({
 
             return (
               <li
+                key={message.id}
                 className={classNames(
                   "flex flex-col w-full",
                   isActiveUserSend ? "items-end" : "items-start",
@@ -140,8 +152,8 @@ export const DirectMessagePage = ({
                   {message.body}
                 </p>
                 <div className="flex gap-1 text-xs">
-                  <time dateTime={toISOString(message.createdAt)}>
-                    {formatShortTime(message.createdAt)}
+                  <time dateTime={message.createdAt}>
+                    {dmTimeFormatter.format(new Date(message.createdAt))}
                   </time>
                   {isActiveUserSend && message.isRead && (
                     <span className="text-cax-text-muted">既読</span>

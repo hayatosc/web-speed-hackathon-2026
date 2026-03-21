@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray } from "drizzle-orm";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { v4 as uuidv4 } from "uuid";
@@ -8,6 +8,41 @@ import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
 import type { HonoEnv } from "../../types";
 
 const router = new Hono<HonoEnv>();
+
+interface PostImagePayload {
+  id: string;
+  alt?: string;
+}
+
+interface PostPayload {
+  images?: unknown;
+  movie?: {
+    id?: unknown;
+  };
+  sound?: {
+    id?: unknown;
+    title?: unknown;
+    artist?: unknown;
+  };
+  text?: string;
+}
+
+function isPostImagePayload(value: unknown): value is PostImagePayload {
+  if (typeof value !== "object" || value === null) {
+    return false;
+  }
+
+  const payload = value as Record<string, unknown>;
+  if (typeof payload["id"] !== "string" || payload["id"].length === 0) {
+    return false;
+  }
+
+  if (payload["alt"] !== undefined && typeof payload["alt"] !== "string") {
+    return false;
+  }
+
+  return true;
+}
 
 // Helper to format post response to match Sequelize's defaultScope
 function formatPost(post: {
@@ -158,7 +193,7 @@ router.post("/posts", async (c) => {
     throw new HTTPException(401);
   }
 
-  const body = await c.req.json();
+  const body = await c.req.json<PostPayload>();
   const postId = uuidv4();
   const now = new Date().toISOString();
 
@@ -181,6 +216,10 @@ router.post("/posts", async (c) => {
 
   const bodySoundId =
     typeof body?.sound?.id === "string" && body.sound.id.length > 0 ? body.sound.id : undefined;
+  const bodySoundTitle =
+    typeof body?.sound?.title === "string" ? body.sound.title : undefined;
+  const bodySoundArtist =
+    typeof body?.sound?.artist === "string" ? body.sound.artist : undefined;
   if (bodySoundId !== undefined) {
     soundId = bodySoundId;
     const existingSound = await db.query.sounds.findFirst({
@@ -189,8 +228,8 @@ router.post("/posts", async (c) => {
     if (!existingSound) {
       await db.insert(schema.sounds).values({
         id: bodySoundId,
-        title: body.sound.title ?? "Unknown",
-        artist: body.sound.artist ?? "Unknown",
+        title: bodySoundTitle ?? "Unknown",
+        artist: bodySoundArtist ?? "Unknown",
       });
     }
   }
@@ -198,30 +237,47 @@ router.post("/posts", async (c) => {
   await db.insert(schema.posts).values({
     id: postId,
     userId,
-    text: typeof body?.text === "string" ? body.text : "",
+    text: body?.text ?? "",
     movieId,
     soundId,
     createdAt: now,
   });
 
-  if (body.images && Array.isArray(body.images)) {
-    for (const img of body.images) {
-      if (img?.id) {
-        const existingImage = await db.query.images.findFirst({
-          where: eq(schema.images.id, img.id),
-        });
-        if (!existingImage) {
-          await db.insert(schema.images).values({
-            id: img.id,
-            alt: img.alt ?? "",
-            createdAt: now,
-          });
-        }
-        await db.insert(schema.postsImagesRelations).values({
+  if (Array.isArray(body.images)) {
+    const uniqueImages = Array.from(
+      new Map(
+        body.images
+          .filter((img): img is PostImagePayload => isPostImagePayload(img))
+          .map((img) => [img.id, img]),
+      ).values(),
+    );
+
+    if (uniqueImages.length > 0) {
+      const imageIds = uniqueImages.map((img) => img.id);
+      const existingImages = await db.query.images.findMany({
+        where: inArray(schema.images.id, imageIds),
+        columns: { id: true },
+      });
+      const existingImageIds = new Set(existingImages.map((image) => image.id));
+
+      const imagesToInsert = uniqueImages
+        .filter((img) => !existingImageIds.has(img.id))
+        .map((img) => ({
+          id: img.id,
+          alt: img.alt ?? "",
+          createdAt: now,
+        }));
+
+      if (imagesToInsert.length > 0) {
+        await db.insert(schema.images).values(imagesToInsert);
+      }
+
+      await db.insert(schema.postsImagesRelations).values(
+        uniqueImages.map((img) => ({
           postId,
           imageId: img.id,
-        });
-      }
+        })),
+      );
     }
   }
 

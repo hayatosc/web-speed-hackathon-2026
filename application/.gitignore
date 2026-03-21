@@ -188,6 +188,7 @@ dist
 
 # SvelteKit build / generate output
 .svelte-kit
+.react-router
 
 ### Windows ###
 # Windows thumbnail cache files

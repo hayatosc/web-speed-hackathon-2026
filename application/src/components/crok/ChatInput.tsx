@@ -94,7 +94,6 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
         `/api/v1/crok/suggestions?q=${encodeURIComponent(inputValue)}`,
       );
       if (cancelled) return;
-
       setSuggestions(results);
       setShowSuggestions(results.length > 0);
     };

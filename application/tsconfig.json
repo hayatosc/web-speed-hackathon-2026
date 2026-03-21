@@ -8,10 +8,11 @@
     "lib": ["DOM", "ESNext"],
     "module": "esnext",
     "moduleResolution": "bundler",
+    "rootDirs": [".", "./.react-router/types"],
     "paths": {
       "@web-speed-hackathon-2026/client/*": ["./*"]
     },
     "exactOptionalPropertyTypes": false
   },
-  "include": ["./src", "./types", "./app"]
+  "include": ["./src", "./types", "./app", "./.react-router/types"]
 }

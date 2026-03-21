@@ -8,10 +8,10 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { Helmet, HelmetProvider } from "react-helmet";
 import { Route, Routes, useLocation, useNavigate } from "react-router";
 
 import { AppPage } from "@web-speed-hackathon-2026/client/src/components/application/AppPage";
+import { DocumentTitle } from "@web-speed-hackathon-2026/client/src/components/foundation/DocumentTitle";
 import { AuthModalContainer } from "@web-speed-hackathon-2026/client/src/containers/AuthModalContainer";
 import { NewPostModalContainer } from "@web-speed-hackathon-2026/client/src/containers/NewPostModalContainer";
 import { TimelineContainer } from "@web-speed-hackathon-2026/client/src/containers/TimelineContainer";
@@ -68,9 +68,7 @@ const LazyUserProfileContainer = lazy(async () => {
 const RouteFallback = ({ title = "読込中 - CaX" }: { title?: string }) => {
   return (
     <>
-      <Helmet>
-        <title>{title}</title>
-      </Helmet>
+      <DocumentTitle title={title} />
       <div className="text-cax-text-muted p-4">読込中...</div>
     </>
   );
@@ -92,16 +90,27 @@ export const AppContainer = () => {
   }, [pathname]);
 
   const [activeUser, setActiveUser] = useState<Models.User | null>(null);
-  const [isLoadingActiveUser, setIsLoadingActiveUser] = useState(true);
   useEffect(() => {
-    void fetchJSON<Models.User>("/api/v1/me")
+    const controller = new AbortController();
+
+    void fetchJSON<Models.User>("/api/v1/me", controller.signal)
       .then((user) => {
+        if (controller.signal.aborted) {
+          return;
+        }
         setActiveUser(user);
       })
-      .finally(() => {
-        setIsLoadingActiveUser(false);
+      .catch(() => {
+        if (controller.signal.aborted) {
+          return;
+        }
+        setActiveUser(null);
       });
-  }, [setActiveUser, setIsLoadingActiveUser]);
+
+    return () => {
+      controller.abort();
+    };
+  }, [setActiveUser]);
   const handleLogout = useCallback(async () => {
     await sendJSON("/api/v1/signout", {});
     setActiveUser(null);
@@ -111,18 +120,8 @@ export const AppContainer = () => {
   const authModalId = useId();
   const newPostModalId = useId();
 
-  if (isLoadingActiveUser) {
-    return (
-      <HelmetProvider>
-        <Helmet>
-          <title>読込中 - CaX</title>
-        </Helmet>
-      </HelmetProvider>
-    );
-  }
-
   return (
-    <HelmetProvider>
+    <>
       <AppPage
         activeUser={activeUser}
         authModalId={authModalId}
@@ -159,6 +158,6 @@ export const AppContainer = () => {
 
       <AuthModalContainer id={authModalId} onUpdateActiveUser={setActiveUser} />
       <NewPostModalContainer id={newPostModalId} />
-    </HelmetProvider>
+    </>
   );
 };

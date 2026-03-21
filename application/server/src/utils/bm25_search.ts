@@ -20,7 +20,6 @@ export function filterSuggestionsBM25(
 
   const tokenizedCandidates = candidates.map((c) => extractTokens(tokenizer.tokenize(c)));
   bm25.index(tokenizedCandidates);
-
   const scores = bm25.getScores(queryTokens);
   const results = candidates.map((text, index) => ({
     text,

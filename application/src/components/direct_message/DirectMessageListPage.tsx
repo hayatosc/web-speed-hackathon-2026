@@ -1,8 +1,43 @@
 import { Button } from "@web-speed-hackathon-2026/client/src/components/foundation/Button";
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/src/components/foundation/FontAwesomeIcon";
 import { Link } from "@web-speed-hackathon-2026/client/src/components/foundation/Link";
-import { formatRelativeTime, toISOString } from "@web-speed-hackathon-2026/client/src/utils/format_long_date";
 import { getProfileImagePath } from "@web-speed-hackathon-2026/client/src/utils/get_path";
+
+const relativeTimeFormatter = new Intl.RelativeTimeFormat("ja", { numeric: "auto" });
+
+function formatRelativeTime(value: Date | string): string {
+  const targetMs = new Date(value).getTime();
+  const diffMs = targetMs - Date.now();
+  const diffSeconds = Math.round(diffMs / 1000);
+  const absSeconds = Math.abs(diffSeconds);
+
+  if (absSeconds < 60) {
+    return relativeTimeFormatter.format(diffSeconds, "second");
+  }
+
+  const diffMinutes = Math.round(diffSeconds / 60);
+  if (Math.abs(diffMinutes) < 60) {
+    return relativeTimeFormatter.format(diffMinutes, "minute");
+  }
+
+  const diffHours = Math.round(diffMinutes / 60);
+  if (Math.abs(diffHours) < 24) {
+    return relativeTimeFormatter.format(diffHours, "hour");
+  }
+
+  const diffDays = Math.round(diffHours / 24);
+  if (Math.abs(diffDays) < 30) {
+    return relativeTimeFormatter.format(diffDays, "day");
+  }
+
+  const diffMonths = Math.round(diffDays / 30);
+  if (Math.abs(diffMonths) < 12) {
+    return relativeTimeFormatter.format(diffMonths, "month");
+  }
+
+  const diffYears = Math.round(diffMonths / 12);
+  return relativeTimeFormatter.format(diffYears, "year");
+}
 
 interface Props {
   activeUser: Models.User;
@@ -40,16 +75,11 @@ export const DirectMessageListPage = ({ activeUser, conversations, error, newDmM
       ) : (
         <ul data-testid="dm-list">
           {conversations.map((conversation) => {
-            const { messages } = conversation;
             const peer =
               conversation.initiator.id !== activeUser.id
                 ? conversation.initiator
                 : conversation.member;
-
-            const lastMessage = messages.at(-1);
-            const hasUnread = messages
-              .filter((m) => m.sender.id === peer.id)
-              .some((m) => !m.isRead);
+            const { hasUnread, lastMessage } = conversation;
 
             return (
               <li className="grid" key={conversation.id}>
@@ -58,7 +88,9 @@ export const DirectMessageListPage = ({ activeUser, conversations, error, newDmM
                     <img
                       alt={peer.profileImage.alt}
                       className="w-12 shrink-0 self-start rounded-full"
+                      height={48}
                       src={getProfileImagePath(peer.profileImage.id)}
+                      width={48}
                     />
                     <div className="flex flex-1 flex-col">
                       <div className="flex items-center justify-between">
@@ -69,7 +101,7 @@ export const DirectMessageListPage = ({ activeUser, conversations, error, newDmM
                         {lastMessage != null && (
                           <time
                             className="text-cax-text-subtle text-xs"
-                            dateTime={toISOString(lastMessage.createdAt)}
+                            dateTime={lastMessage.createdAt}
                           >
                             {formatRelativeTime(lastMessage.createdAt)}
                           </time>

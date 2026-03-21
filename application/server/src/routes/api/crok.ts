@@ -14,8 +14,21 @@ import response from "./crok-response.md?raw";
 
 const router = new Hono<HonoEnv>();
 
+const INITIAL_TTFT_MS = 300;
+const RESPONSE_CHUNK_SIZE = 64;
+const STREAM_CHUNK_DELAY_MS = 4;
+let cachedSuggestions: string[] | null = null;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function splitIntoChunks(value: string, chunkSize: number): string[] {
+  const chunks: string[] = [];
+  for (let i = 0; i < value.length; i += chunkSize) {
+    chunks.push(value.slice(i, i + chunkSize));
+  }
+  return chunks;
 }
 
 router.get("/crok/suggestions", async (c) => {
@@ -25,13 +38,15 @@ router.get("/crok/suggestions", async (c) => {
     return c.json({ suggestions: [] });
   }
 
-  const db = getDb();
-  const rows = await db.select().from(schema.qaSuggestions);
-  const candidates = rows.map((s) => s.question);
+  if (cachedSuggestions === null) {
+    const db = getDb();
+    const rows = await db.select().from(schema.qaSuggestions);
+    cachedSuggestions = rows.map((s) => s.question);
+  }
 
   const tokenizer = await getKuromojiTokenizer();
   const queryTokens = extractTokens(tokenizer.tokenize(q));
-  const suggestions = filterSuggestionsBM25(tokenizer, candidates, queryTokens);
+  const suggestions = filterSuggestionsBM25(tokenizer, cachedSuggestions, queryTokens);
 
   return c.json({ suggestions });
 });
@@ -43,20 +58,18 @@ router.get("/crok", async (c) => {
 
   return streamSSE(c, async (stream) => {
     let messageId = 0;
+    await sleep(INITIAL_TTFT_MS);
 
-    // TTFT (Time to First Token)
-    await sleep(3000);
-
-    for (const char of response as string) {
+    for (const chunk of splitIntoChunks(response as string, RESPONSE_CHUNK_SIZE)) {
       if (stream.aborted) break;
 
       await stream.writeSSE({
-        data: JSON.stringify({ text: char, done: false }),
+        data: JSON.stringify({ text: chunk, done: false }),
         event: "message",
         id: String(messageId++),
       });
 
-      await sleep(10);
+      await sleep(STREAM_CHUNK_DELAY_MS);
     }
 
     if (!stream.aborted) {
