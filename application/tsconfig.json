@@ -14,5 +14,5 @@
     },
     "exactOptionalPropertyTypes": false
   },
-  "include": ["./src", "./types", "./app", "./.react-router/types"]
+  "include": ["./types", "./app", "./.react-router/types"]
 }

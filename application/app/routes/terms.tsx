@@ -1,6 +1,6 @@
 import type { Route } from "./+types/terms";
 
-import { TermContainer } from "@web-speed-hackathon-2026/client/src/containers/TermContainer";
+import { TermContainer } from "@web-speed-hackathon-2026/client/app/containers/TermContainer";
 
 export function meta(): Route.MetaDescriptors {
   return [{ title: "利用規約 - CaX" }];

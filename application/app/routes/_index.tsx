@@ -1,7 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/_index";
 
-import { TimelineContainer } from "@web-speed-hackathon-2026/client/src/containers/TimelineContainer";
+import { TimelineContainer } from "@web-speed-hackathon-2026/client/app/containers/TimelineContainer";
 
 export async function loader({ request }: Route.LoaderArgs) {
   const origin = new URL(request.url).origin;

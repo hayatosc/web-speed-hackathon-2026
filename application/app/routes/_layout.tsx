@@ -2,11 +2,11 @@ import { useCallback, useEffect, useId, useState } from "react";
 import { Outlet, useNavigate, useOutletContext, useLocation } from "react-router";
 import { Provider } from "react-redux";
 
-import { AppPage } from "@web-speed-hackathon-2026/client/src/components/application/AppPage";
-import { AuthModalContainer } from "@web-speed-hackathon-2026/client/src/containers/AuthModalContainer";
-import { NewPostModalContainer } from "@web-speed-hackathon-2026/client/src/containers/NewPostModalContainer";
-import { createAppStore } from "@web-speed-hackathon-2026/client/src/store";
-import { fetchJSON, sendJSON } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
+import { AppPage } from "@web-speed-hackathon-2026/client/app/components/application/AppPage";
+import { AuthModalContainer } from "@web-speed-hackathon-2026/client/app/containers/AuthModalContainer";
+import { NewPostModalContainer } from "@web-speed-hackathon-2026/client/app/containers/NewPostModalContainer";
+import { createAppStore } from "@web-speed-hackathon-2026/client/app/store";
+import { fetchJSON, sendJSON } from "@web-speed-hackathon-2026/client/app/utils/fetchers";
 
 export type LayoutOutletContext = {
   activeUser: Models.User | null;

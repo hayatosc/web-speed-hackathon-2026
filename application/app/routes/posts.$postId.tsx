@@ -1,7 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/posts.$postId";
 
-import { PostContainer } from "@web-speed-hackathon-2026/client/src/containers/PostContainer";
+import { PostContainer } from "@web-speed-hackathon-2026/client/app/containers/PostContainer";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const origin = new URL(request.url).origin;

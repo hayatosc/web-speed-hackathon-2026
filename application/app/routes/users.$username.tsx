@@ -1,7 +1,7 @@
 import { useLoaderData } from "react-router";
 import type { Route } from "./+types/users.$username";
 
-import { UserProfileContainer } from "@web-speed-hackathon-2026/client/src/containers/UserProfileContainer";
+import { UserProfileContainer } from "@web-speed-hackathon-2026/client/app/containers/UserProfileContainer";
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const origin = new URL(request.url).origin;

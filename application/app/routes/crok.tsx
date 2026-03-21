@@ -1,6 +1,6 @@
 import type { Route } from "./+types/crok";
 
-import { CrokContainer } from "@web-speed-hackathon-2026/client/src/containers/CrokContainer";
+import { CrokContainer } from "@web-speed-hackathon-2026/client/app/containers/CrokContainer";
 import { useLayoutOutletContext } from "./_layout";
 
 export function meta(): Route.MetaDescriptors {

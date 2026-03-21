@@ -1,0 +1,37 @@
+import { useParams } from "react-router";
+
+import { InfiniteScroll } from "@web-speed-hackathon-2026/client/app/components/foundation/InfiniteScroll";
+import { UserProfilePage } from "@web-speed-hackathon-2026/client/app/components/user_profile/UserProfilePage";
+import { NotFoundContainer } from "@web-speed-hackathon-2026/client/app/containers/NotFoundContainer";
+import { useFetch } from "@web-speed-hackathon-2026/client/app/hooks/use_fetch";
+import { useInfiniteFetch } from "@web-speed-hackathon-2026/client/app/hooks/use_infinite_fetch";
+import { fetchJSON } from "@web-speed-hackathon-2026/client/app/utils/fetchers";
+
+export const UserProfileContainer = ({ initialUser }: { initialUser?: Models.User }) => {
+  const { username } = useParams();
+
+  const { data: user, isLoading: isLoadingUser } = useFetch<Models.User>(
+    `/api/v1/users/${username}`,
+    fetchJSON,
+    initialUser,
+  );
+  const { data: posts, fetchMore } = useInfiniteFetch<Models.Post>(
+    `/api/v1/users/${username}/posts`,
+    fetchJSON,
+  );
+
+  if (isLoadingUser) {
+    return (
+      <title>読込中 - CaX</title>
+    );
+  }
+
+  if (user === null) {
+    return <NotFoundContainer />;
+  }
+
+  return (
+    <InfiniteScroll fetchMore={fetchMore} items={posts}>      <UserProfilePage timeline={posts} user={user} />
+    </InfiniteScroll>
+  );
+};

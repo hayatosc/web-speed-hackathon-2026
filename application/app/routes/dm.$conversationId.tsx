@@ -1,6 +1,6 @@
 import type { Route } from "./+types/dm.$conversationId";
 
-import { DirectMessageContainer } from "@web-speed-hackathon-2026/client/src/containers/DirectMessageContainer";
+import { DirectMessageContainer } from "@web-speed-hackathon-2026/client/app/containers/DirectMessageContainer";
 import { useLayoutOutletContext } from "./_layout";
 
 export function meta(): Route.MetaDescriptors {
