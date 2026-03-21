@@ -1,26 +1,92 @@
+import { useEffect, useMemo, useState } from "react";
 import { Helmet } from "react-helmet";
 
 import { SearchPage } from "@web-speed-hackathon-2026/client/src/components/application/SearchPage";
 import { InfiniteScroll } from "@web-speed-hackathon-2026/client/src/components/foundation/InfiniteScroll";
-import { useInfiniteFetch } from "@web-speed-hackathon-2026/client/src/hooks/use_infinite_fetch";
 import { useSearchParams } from "@web-speed-hackathon-2026/client/src/hooks/use_search_params";
 import { fetchJSON } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
+
+const LIMIT = 30;
 
 export const SearchContainer = () => {
   const [searchParams] = useSearchParams();
   const query = searchParams.get("q") || "";
+  const [searchResult, setSearchResult] = useState<Models.SearchResponse>({
+    posts: [],
+    sentiment: null,
+  });
+  const [visibleCount, setVisibleCount] = useState(0);
 
-  const { data: posts, fetchMore } = useInfiniteFetch<Models.Post>(
-    query ? `/api/v1/search?q=${encodeURIComponent(query)}` : "",
-    fetchJSON,
-  );
+  useEffect(() => {
+    if (!query) {
+      setSearchResult({
+        posts: [],
+        sentiment: null,
+      });
+      setVisibleCount(0);
+      return;
+    }
+
+    const controller = new AbortController();
+
+    setSearchResult({
+      posts: [],
+      sentiment: null,
+    });
+    setVisibleCount(0);
+
+    void fetchJSON<Models.SearchResponse>(
+      `/api/v1/search?q=${encodeURIComponent(query)}`,
+      controller.signal,
+    ).then(
+      (result) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setSearchResult(result);
+        setVisibleCount(Math.min(LIMIT, result.posts.length));
+      },
+      () => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setSearchResult({
+          posts: [],
+          sentiment: null,
+        });
+        setVisibleCount(0);
+      },
+    );
+
+    return () => {
+      controller.abort();
+    };
+  }, [query]);
+
+  const posts = useMemo(() => searchResult.posts.slice(0, visibleCount), [searchResult.posts, visibleCount]);
+  const fetchMore = () => {
+    setVisibleCount((current) => {
+      if (current >= searchResult.posts.length) {
+        return current;
+      }
+
+      return Math.min(current + LIMIT, searchResult.posts.length);
+    });
+  };
 
   return (
     <InfiniteScroll fetchMore={fetchMore} items={posts}>
       <Helmet>
         <title>検索 - CaX</title>
       </Helmet>
-      <SearchPage query={query} results={posts} initialValues={{ searchText: query }} />
+      <SearchPage
+        query={query}
+        results={posts}
+        sentiment={searchResult.sentiment}
+        initialValues={{ searchText: query }}
+      />
     </InfiniteScroll>
   );
 };

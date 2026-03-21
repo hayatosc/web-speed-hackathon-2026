@@ -19,6 +19,8 @@ tags:
     description: ダイレクトメッセージ
   - name: Search
     description: 検索
+  - name: Translation
+    description: 翻訳
   - name: Crok
     description: AI チャット
   - name: Initialize
@@ -646,7 +648,7 @@ paths:
       operationId: searchPosts
       description: |
         テキスト・ユーザー名・名前で投稿を検索する。
-        クエリ内に `from:YYYY-MM-DD` / `until:YYYY-MM-DD` を含めると日付フィルタが適用される。
+        クエリ内に `since:YYYY-MM-DD` / `until:YYYY-MM-DD` を含めると日付フィルタが適用される。
       parameters:
         - name: q
           in: query
@@ -662,9 +664,37 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Post"
+                $ref: "#/components/schemas/SearchResponse"
+  /translate:
+    post:
+      tags:
+        - Translation
+      summary: テキスト翻訳
+      operationId: translateText
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TranslationRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TranslationResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "502":
+          description: Bad Gateway
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
   /crok/suggestions:
     get:
       tags:
@@ -920,3 +950,47 @@ components:
           format: date-time
         sender:
           $ref: "#/components/schemas/User"
+
+    Sentiment:
+      type: object
+      required: [score, label]
+      properties:
+        score:
+          type: number
+        label:
+          type: string
+          enum: [positive, negative, neutral]
+
+    SearchResponse:
+      type: object
+      required: [posts, sentiment]
+      properties:
+        posts:
+          type: array
+          items:
+            $ref: "#/components/schemas/Post"
+        sentiment:
+          allOf:
+            - $ref: "#/components/schemas/Sentiment"
+          nullable: true
+
+    TranslationRequest:
+      type: object
+      required: [text, sourceLanguage, targetLanguage]
+      properties:
+        text:
+          type: string
+          minLength: 1
+        sourceLanguage:
+          type: string
+          enum: [ja]
+        targetLanguage:
+          type: string
+          enum: [en]
+
+    TranslationResponse:
+      type: object
+      required: [result]
+      properties:
+        result:
+          type: string

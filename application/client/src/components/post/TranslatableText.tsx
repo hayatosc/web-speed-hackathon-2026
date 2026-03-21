@@ -1,5 +1,7 @@
 import { useCallback, useState } from "react";
 
+import { sendJSON } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
+
 type State =
   | { type: "idle"; text: string }
   | { type: "loading" }
@@ -8,8 +10,6 @@ type State =
 interface Props {
   text: string;
 }
-
-const loadTranslator = () => import("@web-speed-hackathon-2026/client/src/utils/create_translator");
 
 export const TranslatableText = ({ text }: Props) => {
   const [state, updateState] = useState<State>({ type: "idle", text });
@@ -20,16 +20,15 @@ export const TranslatableText = ({ text }: Props) => {
         void (async () => {
           updateState({ type: "loading" });
           try {
-            const { createTranslator } = await loadTranslator();
-            using translator = await createTranslator({
+            const result = await sendJSON<Models.TranslationResponse>("/api/v1/translate", {
+              text: state.text,
               sourceLanguage: "ja",
               targetLanguage: "en",
             });
-            const result = await translator.translate(state.text);
 
             updateState({
               type: "translated",
-              text: result,
+              text: result.result,
               original: state.text,
             });
           } catch {

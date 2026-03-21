@@ -3,10 +3,19 @@ import { Hono } from "hono";
 
 import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
 import { parseSearchQuery } from "@web-speed-hackathon-2026/server/src/utils/parse_search_query.js";
+import { analyzeSentiment } from "@web-speed-hackathon-2026/server/src/utils/analyze_sentiment.js";
 
 import type { HonoEnv } from "../../types";
 
 const router = new Hono<HonoEnv>();
+
+export type SearchResponse = {
+  posts: ReturnType<typeof formatPost>[];
+  sentiment: {
+    score: number;
+    label: "positive" | "negative" | "neutral";
+  } | null;
+};
 
 // Helper to format post response
 function formatPost(post: {
@@ -55,13 +64,19 @@ router.get("/search", async (c) => {
   const query = c.req.query("q");
 
   if (typeof query !== "string" || query.trim() === "") {
-    return c.json([]);
+    return c.json<SearchResponse>({
+      posts: [],
+      sentiment: null,
+    });
   }
 
   const { keywords, sinceDate, untilDate } = parseSearchQuery(query);
 
   if (!keywords && !sinceDate && !untilDate) {
-    return c.json([]);
+    return c.json<SearchResponse>({
+      posts: [],
+      sentiment: null,
+    });
   }
 
   const searchTerm = keywords ? `%${keywords}%` : null;
@@ -115,7 +130,13 @@ router.get("/search", async (c) => {
     offset,
   });
 
-  return c.json(result.map(formatPost));
+  const posts = result.map(formatPost);
+  const sentiment = keywords ? await analyzeSentiment(keywords) : null;
+
+  return c.json<SearchResponse>({
+    posts,
+    sentiment,
+  });
 });
 
 export { router as searchRouter };
