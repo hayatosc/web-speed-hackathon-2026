@@ -250,7 +250,7 @@ async function emitDmEvents(messageId: string) {
   const unreadCount = await getUnreadCount(receiverId);
 
   eventhub.emit(`dm:conversation/${conversation.id}:message`, formatDirectMessage(directMessage));
-  eventhub.emit(`dm:unread/${receiverId}`, { unreadCount });
+  eventhub.emit(`dm:unread/${receiverId}`, { unreadCount, conversationId: conversation.id });
 }
 
 export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {

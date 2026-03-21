@@ -44,11 +44,26 @@ export const DirectMessageListContainer = ({ activeUser, authModalId }: Props) =
     void loadConversations();
   }, [activeUser, loadConversations]);
 
-  useWs("/api/v1/dm/unread", () => {
-    if (activeUser !== null) {
-      void loadConversations();
-    }
-  });
+  useWs<{ type: string; payload: { unreadCount: number; conversationId?: string } }>(
+    "/api/v1/dm/unread",
+    ({ payload }) => {
+      if (activeUser === null) return;
+
+      if (payload.conversationId != null) {
+        setConversations((prev) => {
+          if (prev === null) {
+            void loadConversations();
+            return prev;
+          }
+          return prev.map((conv) =>
+            conv.id === payload.conversationId ? { ...conv, hasUnread: true } : conv
+          );
+        });
+      } else {
+        void loadConversations();
+      }
+    },
+  );
 
   if (activeUser === null) {
     return (
