@@ -41,7 +41,6 @@ export function useHasContentBelow(
     window.addEventListener("resize", scheduleUpdate, { passive: true });
 
     const resizeObserver = new ResizeObserver(scheduleUpdate);
-    resizeObserver.observe(document.body);
     if (contentEndRef.current) {
       resizeObserver.observe(contentEndRef.current);
     }
