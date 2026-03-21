@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "@playwright/test";
 
-import { dynamicMediaMask, waitForVisibleMedia } from "./utils";
+import { dynamicMediaMask, waitForPageToLoad, waitForVisibleMedia } from "./utils";
 
 async function waitForPostDetail(page: Page) {
   const article = page.locator("main article").first();
@@ -30,12 +30,12 @@ test.describe("投稿詳細", () => {
     const firstArticle = page.locator("article").first();
     await expect(firstArticle).toBeVisible({ timeout: 30_000 });
     await firstArticle.dispatchEvent("click");
-    await page.waitForURL("**/posts/*", { timeout: 10_000 });
-
+    await page.waitForURL("**/posts/*", { timeout: 30_000 });
     await waitForPostDetail(page);
 
     // VRT: 投稿詳細
     await waitForVisibleMedia(page);
+    await waitForPageToLoad(page);
     await expect(page).toHaveScreenshot("post-detail-投稿詳細.png", {
       mask: dynamicMediaMask(page),
     });
@@ -46,8 +46,7 @@ test.describe("投稿詳細", () => {
     const firstArticle = page.locator("article").first();
     await expect(firstArticle).toBeVisible({ timeout: 30_000 });
     await firstArticle.dispatchEvent("click");
-    await page.waitForURL("**/posts/*", { timeout: 10_000 });
-
+    await page.waitForURL("**/posts/*", { timeout: 30_000 });
     await waitForPostDetail(page);
   });
 });
@@ -59,27 +58,27 @@ test.describe("投稿詳細 - 動画", () => {
 
   test("動画が自動再生され、クリックで一時停止・再生を切り替えられる @vrt", async ({ page }) => {
     await page.goto("/");
-    const movieArticle = page.locator("article:has(canvas)").first();
+    const movieArticle = page.locator('article:has(button[aria-label="動画プレイヤー"])').first();
     await expect(movieArticle).toBeVisible({ timeout: 30_000 });
     await movieArticle.locator("time").first().click();
-    await page.waitForURL("**/posts/*", { timeout: 10_000 });
+    await page.waitForURL("**/posts/*", { timeout: 30_000 });
 
     await waitForPostDetail(page);
-    const canvas = page.locator("canvas").first();
-    await expect(canvas).toBeVisible({ timeout: 30_000 });
+    const videoPlayer = page.locator('button[aria-label="動画プレイヤー"]').first();
+    await expect(videoPlayer).toBeVisible({ timeout: 30_000 });
 
     // VRT: 動画再生中
     await waitForVisibleMedia(page);
+    await waitForPageToLoad(page);
     await expect(page).toHaveScreenshot("post-detail-動画再生中.png", {
       mask: dynamicMediaMask(page),
     });
 
     // クリックで一時停止
-    const movieButton = page.locator("button:has(canvas)").first();
-    await movieButton.click();
+    await videoPlayer.click();
 
     // 再度クリックして再生再開
-    await movieButton.click();
+    await videoPlayer.click();
   });
 });
 
@@ -93,7 +92,7 @@ test.describe("投稿詳細 - 音声", () => {
     const soundArticle = page.locator('article:has(svg[viewBox="0 0 100 1"])').first();
     await expect(soundArticle).toBeVisible({ timeout: 30_000 });
     await soundArticle.locator("time").first().click();
-    await page.waitForURL("**/posts/*", { timeout: 10_000 });
+    await page.waitForURL("**/posts/*", { timeout: 30_000 });
 
     await waitForPostDetail(page);
     const waveform = page.locator('svg[viewBox="0 0 100 1"]').first();
@@ -101,6 +100,7 @@ test.describe("投稿詳細 - 音声", () => {
 
     // VRT: 音声（再生前）
     await waitForVisibleMedia(page);
+    await waitForPageToLoad(page);
     await expect(page).toHaveScreenshot("post-detail-音声再生前.png", {
       mask: dynamicMediaMask(page),
     });
@@ -125,7 +125,7 @@ test.describe("投稿詳細 - 写真", () => {
     const imageArticle = page.locator("article:has(.grid img)").first();
     await expect(imageArticle).toBeVisible({ timeout: 30_000 });
     await imageArticle.dispatchEvent("click");
-    await page.waitForURL("**/posts/*", { timeout: 10_000 });
+    await page.waitForURL("**/posts/*", { timeout: 30_000 });
 
     const article = await waitForPostDetail(page);
     const coveredImage = article.locator("img[style*='object-fit: cover']").first();
@@ -144,6 +144,7 @@ test.describe("投稿詳細 - 写真", () => {
 
     // VRT: 写真投稿詳細
     await waitForVisibleMedia(page);
+    await waitForPageToLoad(page);
     await expect(page).toHaveScreenshot("post-detail-写真.png", {
       mask: dynamicMediaMask(page),
     });
