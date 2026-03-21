@@ -64,6 +64,11 @@ jobs:
                     --max-instances "${{ env.PRODUCTION_MAX_INSTANCES }}" \
                     --labels "managed-by=github-actions,environment=production" \
                     --quiet
+                  gcloud run services update-traffic "${{ env.CLOUD_RUN_SERVICE }}" \
+                    --project "${{ env.GCP_PROJECT_ID }}" \
+                    --region "${{ env.GCP_REGION }}" \
+                    --to-latest \
+                    --quiet
 
             - name: Get production URL
               id: production_url
