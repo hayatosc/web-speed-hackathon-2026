@@ -9,6 +9,9 @@ export function extractTokens(tokens: IpadicFeatures[]): string[] {
     .map((t) => t.surface_form.toLowerCase());
 }
 
+let cachedBm25: BM25 | null = null;
+let cachedCandidatesKey: string[] | null = null;
+
 export function filterSuggestionsBM25(
   tokenizer: Tokenizer<IpadicFeatures>,
   candidates: string[],
@@ -16,11 +19,16 @@ export function filterSuggestionsBM25(
 ): string[] {
   if (queryTokens.length === 0) return [];
 
-  const bm25 = new BM25({ k1: 1.2, b: 0.75 });
+  // Rebuild the index only when the corpus changes
+  if (cachedCandidatesKey !== candidates) {
+    const bm25 = new BM25({ k1: 1.2, b: 0.75 });
+    const tokenizedCandidates = candidates.map((c) => extractTokens(tokenizer.tokenize(c)));
+    bm25.index(tokenizedCandidates);
+    cachedBm25 = bm25;
+    cachedCandidatesKey = candidates;
+  }
 
-  const tokenizedCandidates = candidates.map((c) => extractTokens(tokenizer.tokenize(c)));
-  bm25.index(tokenizedCandidates);
-  const scores = bm25.getScores(queryTokens);
+  const scores = cachedBm25!.getScores(queryTokens);
   const results = candidates.map((text, index) => ({
     text,
     score: scores[index] ?? 0,

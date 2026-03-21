@@ -98,10 +98,13 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
       setShowSuggestions(results.length > 0);
     };
 
-    void updateSuggestions();
+    const timerId = setTimeout(() => {
+      void updateSuggestions();
+    }, 300);
 
     return () => {
       cancelled = true;
+      clearTimeout(timerId);
     };
   }, [inputValue]);
 
