@@ -96,7 +96,7 @@ export const SoundPlayer = ({ sound }: Props) => {
             ) : (
               <div className="relative h-full w-full">
                 <div className="absolute inset-0 h-full w-full">
-                  <SoundWaveSVG peaks={sound.waveformPeaks} />
+                  <SoundWaveSVG peaks={sound.waveformPeaks ?? []} />
                 </div>
                 <div
                   className="bg-cax-surface-subtle absolute inset-0 h-full w-full opacity-75"
