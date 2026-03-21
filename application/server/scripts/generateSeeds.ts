@@ -1,4 +1,4 @@
-import { createWriteStream } from "node:fs";
+import { createWriteStream, promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -19,6 +19,11 @@ import type {
   SoundSeed,
   UserSeed,
 } from "../src/types/seed";
+import { PUBLIC_PATH } from "../src/paths";
+import {
+  extractImageDetailsFromFile,
+  extractSoundDetails,
+} from "../src/utils/media_metadata";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const seedsDir = path.resolve(__dirname, "../seeds");
@@ -178,12 +183,21 @@ function pickRandomN<T>(arr: T[], n: number): T[] {
   return faker.helpers.arrayElements(arr, n);
 }
 
-function generateProfileImages(): ProfileImageSeed[] {
+async function generateProfileImages(): Promise<ProfileImageSeed[]> {
   // Use existing profile image IDs from public/images/profiles/
-  return EXISTING_PROFILE_IMAGE_IDS.map((id) => ({
-    id,
-    alt: "",
-  }));
+  return Promise.all(
+    EXISTING_PROFILE_IMAGE_IDS.map(async (id) => {
+      const filePath = path.resolve(PUBLIC_PATH, `images/profiles/${id}.jpg`);
+      const { alt, height, width } = await extractImageDetailsFromFile(filePath);
+
+      return {
+        alt,
+        height,
+        id,
+        width,
+      };
+    }),
+  );
 }
 
 function generateUsers(count: number, profileImages: ProfileImageSeed[]): UserSeed[] {
@@ -217,14 +231,23 @@ function generateUsers(count: number, profileImages: ProfileImageSeed[]): UserSe
   return users;
 }
 
-function generateImages(): ImageSeed[] {
+async function generateImages(): Promise<ImageSeed[]> {
   // Use existing image IDs from public/images/
   const baseTime = now - ONE_WEEK_MS;
-  return EXISTING_IMAGE_IDS.map((id, i) => ({
-    id,
-    alt: "",
-    createdAt: new Date(baseTime + i * 60 * 1000).toISOString(),
-  }));
+  return Promise.all(
+    EXISTING_IMAGE_IDS.map(async (id, i) => {
+      const filePath = path.resolve(PUBLIC_PATH, `images/${id}.jpg`);
+      const { alt, height, width } = await extractImageDetailsFromFile(filePath);
+
+      return {
+        alt,
+        createdAt: new Date(baseTime + i * 60 * 1000).toISOString(),
+        height,
+        id,
+        width,
+      };
+    }),
+  );
 }
 
 function generateMovies(): MovieSeed[] {
@@ -234,13 +257,22 @@ function generateMovies(): MovieSeed[] {
   }));
 }
 
-function generateSounds(): SoundSeed[] {
+async function generateSounds(): Promise<SoundSeed[]> {
   // Use existing sound data from public/sounds/
-  return EXISTING_SOUNDS.map(({ id, title, artist }) => ({
-    id,
-    title,
-    artist,
-  }));
+  return Promise.all(
+    EXISTING_SOUNDS.map(async ({ id, title, artist }) => {
+      const filePath = path.resolve(PUBLIC_PATH, `sounds/${id}.mp3`);
+      const { durationMs, waveformPeaks } = await extractSoundDetails(await fs.readFile(filePath));
+
+      return {
+        artist,
+        durationMs,
+        id,
+        title,
+        waveformPeaks,
+      };
+    }),
+  );
 }
 
 const postTemplates = [
@@ -695,19 +727,19 @@ async function main() {
   console.log("Generating seed data...");
 
   console.log("1. Generating ProfileImages (using existing assets)...");
-  const profileImages = generateProfileImages();
+  const profileImages = await generateProfileImages();
 
   console.log("2. Generating Users...");
   const users = generateUsers(CONFIG.USER_COUNT, profileImages);
 
   console.log("3. Generating Images (using existing assets)...");
-  const images = generateImages();
+  const images = await generateImages();
 
   console.log("4. Generating Movies (using existing assets)...");
   const movies = generateMovies();
 
   console.log("5. Generating Sounds (using existing assets)...");
-  const sounds = generateSounds();
+  const sounds = await generateSounds();
 
   console.log("6. Generating Posts...");
   const posts = generatePosts(CONFIG.POST_COUNT, users, movies, sounds);

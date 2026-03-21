@@ -33,11 +33,15 @@ function formatPost(post: {
     password: string;
     profileImageId: string;
     createdAt: string;
-    profileImage: { id: string; alt: string } | null;
+    profileImage: { id: string; alt: string; width: number; height: number } | null;
   };
   movie: { id: string } | null;
-  sound: { id: string; title: string; artist: string } | null;
-  postImages: Array<{ postId: string; imageId: string; image: { id: string; alt: string; createdAt: string } }>;
+  sound: { id: string; title: string; artist: string; durationMs: number; waveformPeaks: number[] } | null;
+  postImages: Array<{
+    postId: string;
+    imageId: string;
+    image: { id: string; alt: string; createdAt: string; width: number; height: number };
+  }>;
 }) {
   const { userId, movieId, soundId, postImages, user, ...postData } = post;
   const { profileImageId, password, ...userData } = user;

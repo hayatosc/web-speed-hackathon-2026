@@ -5,6 +5,8 @@ import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core"
 export const profileImages = sqliteTable("ProfileImages", {
   id: text("id").primaryKey(),
   alt: text("alt").notNull().default(""),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
 });
 
 // Users table
@@ -26,6 +28,8 @@ export const images = sqliteTable("Images", {
   id: text("id").primaryKey(),
   alt: text("alt").notNull().default(""),
   createdAt: text("createdAt").notNull(),
+  width: integer("width").notNull(),
+  height: integer("height").notNull(),
 });
 
 // Movies table
@@ -38,6 +42,8 @@ export const sounds = sqliteTable("Sounds", {
   id: text("id").primaryKey(),
   title: text("title").notNull().default("Unknown"),
   artist: text("artist").notNull().default("Unknown"),
+  durationMs: integer("durationMs").notNull(),
+  waveformPeaks: text("waveformPeaks", { mode: "json" }).$type<number[]>().notNull(),
 });
 
 // Posts table

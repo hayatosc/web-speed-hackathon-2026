@@ -12,7 +12,9 @@ declare namespace Models {
 
   interface ProfileImage {
     alt: string;
+    height: number;
     id: string;
+    width: number;
   }
 
   interface Post {
@@ -27,13 +29,17 @@ declare namespace Models {
 
   interface Image {
     alt: string;
+    height: number;
     id: string;
+    width: number;
   }
 
   interface Sound {
     artist: string;
+    durationMs: number;
     id: string;
     title: string;
+    waveformPeaks: number[];
   }
 
   interface Movie {

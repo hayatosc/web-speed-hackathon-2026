@@ -12,6 +12,8 @@ const router = new Hono<HonoEnv>();
 interface PostImagePayload {
   id: string;
   alt?: string;
+  height?: number;
+  width?: number;
 }
 
 interface PostPayload {
@@ -23,6 +25,8 @@ interface PostPayload {
     id?: unknown;
     title?: unknown;
     artist?: unknown;
+    durationMs?: unknown;
+    waveformPeaks?: unknown;
   };
   text?: string;
 }
@@ -40,8 +44,18 @@ function isPostImagePayload(value: unknown): value is PostImagePayload {
   if (payload['alt'] !== undefined && typeof payload['alt'] !== 'string') {
     return false;
   }
+  if (payload['width'] !== undefined && !Number.isFinite(payload['width'])) {
+    return false;
+  }
+  if (payload['height'] !== undefined && !Number.isFinite(payload['height'])) {
+    return false;
+  }
 
   return true;
+}
+
+function isWaveformPeaks(value: unknown): value is number[] {
+  return Array.isArray(value) && value.every((peak) => Number.isFinite(peak));
 }
 
 // Helper to format post response to match Sequelize's defaultScope
@@ -60,11 +74,15 @@ function formatPost(post: {
     password: string;
     profileImageId: string;
     createdAt: string;
-    profileImage: { id: string; alt: string } | null;
+    profileImage: { id: string; alt: string; width: number; height: number } | null;
   };
   movie: { id: string } | null;
-  sound: { id: string; title: string; artist: string } | null;
-  postImages: Array<{ postId: string; imageId: string; image: { id: string; alt: string; createdAt: string } }>;
+  sound: { id: string; title: string; artist: string; durationMs: number; waveformPeaks: number[] } | null;
+  postImages: Array<{
+    postId: string;
+    imageId: string;
+    image: { id: string; alt: string; createdAt: string; width: number; height: number };
+  }>;
 }) {
   const { userId, movieId, soundId, postImages, user, ...postData } = post;
   const { profileImageId, password, ...userData } = user;
@@ -216,6 +234,13 @@ router.post('/posts', async (c) => {
   const bodySoundId = typeof body?.sound?.id === 'string' && body.sound.id.length > 0 ? body.sound.id : undefined;
   const bodySoundTitle = typeof body?.sound?.title === 'string' ? body.sound.title : undefined;
   const bodySoundArtist = typeof body?.sound?.artist === 'string' ? body.sound.artist : undefined;
+  const bodySoundDurationMs =
+    typeof body?.sound?.durationMs === 'number' && Number.isFinite(body.sound.durationMs)
+      ? Math.max(0, Math.round(body.sound.durationMs))
+      : undefined;
+  const bodySoundWaveformPeaks = isWaveformPeaks(body?.sound?.waveformPeaks)
+    ? body.sound.waveformPeaks
+    : undefined;
   if (bodySoundId !== undefined) {
     soundId = bodySoundId;
     const existingSound = await db.query.sounds.findFirst({
@@ -226,6 +251,8 @@ router.post('/posts', async (c) => {
         id: bodySoundId,
         title: bodySoundTitle ?? 'Unknown',
         artist: bodySoundArtist ?? 'Unknown',
+        durationMs: bodySoundDurationMs ?? 0,
+        waveformPeaks: bodySoundWaveformPeaks ?? [],
       });
     }
   }
@@ -258,6 +285,14 @@ router.post('/posts', async (c) => {
           id: img.id,
           alt: img.alt ?? '',
           createdAt: now,
+          height:
+            typeof img.height === 'number' && Number.isFinite(img.height)
+              ? Math.max(1, Math.round(img.height))
+              : 1,
+          width:
+            typeof img.width === 'number' && Number.isFinite(img.width)
+              ? Math.max(1, Math.round(img.width))
+              : 1,
         }));
 
       if (imagesToInsert.length > 0) {

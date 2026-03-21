@@ -35,7 +35,11 @@ export const NewDirectMessageModalPage = ({ id, onSubmit }: Props) => {
         />
 
         <div className="grid gap-y-2">
-          <ModalSubmitButton disabled={isSubmitting || isInvalid} loading={isSubmitting}>
+          <ModalSubmitButton
+            className={submitError ? "!bg-cax-brand/50 hover:!bg-cax-brand/50" : undefined}
+            disabled={isSubmitting || isInvalid}
+            loading={isSubmitting}
+          >
             DMを開始
           </ModalSubmitButton>
           <Button variant="secondary" command="close" commandfor={id}>

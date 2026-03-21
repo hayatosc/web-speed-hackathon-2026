@@ -2,17 +2,22 @@ import classNames from "classnames";
 import {
   ChangeEvent,
   useCallback,
+  FormEvent,
+  KeyboardEvent,
+  useEffect,
   useId,
   useRef,
   useState,
-  KeyboardEvent,
-  FormEvent,
-  useEffect,
 } from "react";
 
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/app/components/foundation/FontAwesomeIcon";
+import { OptimizedImage } from "@web-speed-hackathon-2026/client/app/components/foundation/OptimizedImage";
 import { DirectMessageFormData } from "@web-speed-hackathon-2026/client/app/direct_message/types";
-import { getProfileImagePath } from "@web-speed-hackathon-2026/client/app/utils/get_path";
+import {
+  getProfileImageAvifPath,
+  getProfileImagePath,
+  hasProfileImageAvifAsset,
+} from "@web-speed-hackathon-2026/client/app/utils/get_path";
 
 const dmTimeFormatter = new Intl.DateTimeFormat("ja-JP", {
   hour: "2-digit",
@@ -102,11 +107,16 @@ export const DirectMessagePage = ({
   return (
     <section className="bg-cax-surface flex min-h-[calc(100vh-(--spacing(12)))] flex-col lg:min-h-screen">
       <header className="border-cax-border bg-cax-surface sticky top-0 z-10 flex items-center gap-2 border-b px-4 py-3">
-        <img
+        <OptimizedImage
           alt={peer.profileImage.alt}
+          avifSrc={
+            hasProfileImageAvifAsset(peer.profileImage.id)
+              ? getProfileImageAvifPath(peer.profileImage.id)
+              : undefined
+          }
           className="h-12 w-12 rounded-full object-cover"
+          fallbackSrc={getProfileImagePath(peer.profileImage.id)}
           height={peer.profileImage.height}
-          src={getProfileImagePath(peer.profileImage.id)}
           width={peer.profileImage.width}
         />
         <div className="min-w-0">
