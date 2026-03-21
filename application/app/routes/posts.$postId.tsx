@@ -5,9 +5,11 @@ import { PostContainer } from "@web-speed-hackathon-2026/client/src/containers/P
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const origin = new URL(request.url).origin;
-  const post = await fetch(`${origin}/api/v1/posts/${params.postId}`).then(
-    (r) => r.json() as Promise<Models.Post>,
-  );
+  const res = await fetch(`${origin}/api/v1/posts/${params.postId}`);
+  if (!res.ok) {
+    throw new Response(null, { status: res.status });
+  }
+  const post = (await res.json()) as Models.Post;
   return { post };
 }
 

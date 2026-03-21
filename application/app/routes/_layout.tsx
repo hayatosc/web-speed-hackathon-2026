@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useLayoutEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { Outlet, useNavigate, useOutletContext, useLocation } from "react-router";
 import { Provider } from "react-redux";
 
@@ -27,15 +27,19 @@ export default function Layout() {
     window.history.scrollRestoration = "manual";
   }, []);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     window.scrollTo(0, 0);
   }, [pathname]);
 
   const [activeUser, setActiveUser] = useState<Models.User | null>(null);
   useEffect(() => {
-    void fetchJSON<Models.User>("/api/v1/me").then((user) => {
-      setActiveUser(user);
-    });
+    void fetchJSON<Models.User>("/api/v1/me")
+      .then((user) => {
+        setActiveUser(user);
+      })
+      .catch(() => {
+        setActiveUser(null);
+      });
   }, []);
 
   const authModalId = useId();

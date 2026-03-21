@@ -38,14 +38,6 @@ export default defineConfig(async () => {
           replacement: resolve(__dirname, "."),
         },
         {
-          find: /^bayesian-bm25$/,
-          replacement: resolve(__dirname, "node_modules/bayesian-bm25/dist/index.js"),
-        },
-        {
-          find: /^kuromoji$/,
-          replacement: resolve(__dirname, "node_modules/kuromoji/build/kuromoji.js"),
-        },
-        {
           find: /^@ffmpeg\/ffmpeg$/,
           replacement: resolve(__dirname, "node_modules/@ffmpeg/ffmpeg/dist/esm/index.js"),
         },

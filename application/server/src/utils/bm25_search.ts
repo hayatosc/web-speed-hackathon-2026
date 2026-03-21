@@ -1,20 +1,14 @@
 import { BM25 } from "bayesian-bm25";
-import type { Tokenizer, IpadicFeatures } from "kuromoji";
+import type { IpadicFeatures, Tokenizer } from "kuromoji";
 
 const STOP_POS = new Set(["助詞", "助動詞", "記号"]);
 
-/**
- * 形態素解析で内容語トークン（名詞、動詞、形容詞など）を抽出
- */
 export function extractTokens(tokens: IpadicFeatures[]): string[] {
   return tokens
     .filter((t) => t.surface_form !== "" && t.pos !== "" && !STOP_POS.has(t.pos))
     .map((t) => t.surface_form.toLowerCase());
 }
 
-/**
- * BM25で候補をスコアリングして、クエリと類似度の高い上位10件を返す
- */
 export function filterSuggestionsBM25(
   tokenizer: Tokenizer<IpadicFeatures>,
   candidates: string[],
@@ -33,7 +27,6 @@ export function filterSuggestionsBM25(
     score: scores[index] ?? 0,
   }));
 
-  // スコアが高い（＝類似度が高い）ものが下に来るように、上位10件を取得する
   return results
     .filter((result) => result.score > 0)
     .sort((left, right) => left.score - right.score)

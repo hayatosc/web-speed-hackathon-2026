@@ -3,6 +3,8 @@ import { HTTPException } from "hono/http-exception";
 import { streamSSE } from "hono/streaming";
 
 import { getDb, schema } from "@web-speed-hackathon-2026/server/src/db";
+import { extractTokens, filterSuggestionsBM25 } from "@web-speed-hackathon-2026/server/src/utils/bm25_search.js";
+import { getKuromojiTokenizer } from "@web-speed-hackathon-2026/server/src/utils/kuromoji_tokenizer.js";
 
 import type { HonoEnv } from "../../types";
 
@@ -17,9 +19,21 @@ function sleep(ms: number): Promise<void> {
 }
 
 router.get("/crok/suggestions", async (c) => {
+  const q = c.req.query("q");
+
+  if (!q || !q.trim()) {
+    return c.json({ suggestions: [] });
+  }
+
   const db = getDb();
-  const suggestions = await db.select().from(schema.qaSuggestions);
-  return c.json({ suggestions: suggestions.map((s) => s.question) });
+  const rows = await db.select().from(schema.qaSuggestions);
+  const candidates = rows.map((s) => s.question);
+
+  const tokenizer = await getKuromojiTokenizer();
+  const queryTokens = extractTokens(tokenizer.tokenize(q));
+  const suggestions = filterSuggestionsBM25(tokenizer, candidates, queryTokens);
+
+  return c.json({ suggestions });
 });
 
 router.get("/crok", async (c) => {

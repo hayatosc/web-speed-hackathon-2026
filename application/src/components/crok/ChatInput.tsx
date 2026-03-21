@@ -1,4 +1,3 @@
-import { type Tokenizer, type IpadicFeatures } from "kuromoji";
 import {
   useEffect,
   useLayoutEffect,
@@ -10,25 +9,18 @@ import {
 } from "react";
 
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/src/components/foundation/FontAwesomeIcon";
-import {
-  extractTokens,
-  filterSuggestionsBM25,
-} from "@web-speed-hackathon-2026/client/src/utils/bm25_search";
 import { fetchJSON } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
-import { getKuromojiTokenizer } from "@web-speed-hackathon-2026/client/src/utils/kuromoji_tokenizer";
 
 interface Props {
   isStreaming: boolean;
   onSendMessage: (message: string) => void;
 }
 
-// トークン単位でハイライト
 function highlightMatchByTokens(text: string, queryTokens: string[]): React.ReactNode {
   if (queryTokens.length === 0) return text;
 
   const lowerText = text.toLowerCase();
 
-  // テキスト内でクエリトークンにマッチする範囲を収集
   const ranges: { start: number; end: number }[] = [];
   for (const token of queryTokens) {
     let pos = 0;
@@ -42,7 +34,6 @@ function highlightMatchByTokens(text: string, queryTokens: string[]): React.Reac
 
   if (ranges.length === 0) return text;
 
-  // 範囲をソートしてマージ
   ranges.sort((a, b) => a.start - b.start);
   const merged: { start: number; end: number }[] = [ranges[0]!];
   for (let i = 1; i < ranges.length; i++) {
@@ -79,62 +70,31 @@ function highlightMatchByTokens(text: string, queryTokens: string[]): React.Reac
 export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
-  const [tokenizer, setTokenizer] = useState<Tokenizer<IpadicFeatures> | null>(null);
   const [inputValue, setInputValue] = useState("");
   const [suggestions, setSuggestions] = useState<string[]>([]);
-  const [queryTokens, setQueryTokens] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // サジェストが更新されたら一番下にスクロール
   useLayoutEffect(() => {
     if (suggestionsRef.current && showSuggestions) {
       suggestionsRef.current.scrollTop = suggestionsRef.current.scrollHeight;
     }
   }, [suggestions, showSuggestions]);
 
-  // 初回にkuromojiトークナイザーを構築
-  useEffect(() => {
-    let mounted = true;
-
-    const init = async () => {
-      const nextTokenizer = await getKuromojiTokenizer();
-      if (mounted) {
-        setTokenizer(nextTokenizer);
-      }
-    };
-    void init();
-
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
 
     const updateSuggestions = async () => {
-      if (!tokenizer || !inputValue.trim()) {
+      if (!inputValue.trim()) {
         setSuggestions([]);
-        setQueryTokens([]);
         setShowSuggestions(false);
         return;
       }
 
-      const { suggestions: candidates } = await fetchJSON<{ suggestions: string[] }>(
-        "/api/v1/crok/suggestions",
+      const { suggestions: results } = await fetchJSON<{ suggestions: string[] }>(
+        `/api/v1/crok/suggestions?q=${encodeURIComponent(inputValue)}`,
       );
-      if (cancelled) {
-        return;
-      }
+      if (cancelled) return;
 
-      const tokens = extractTokens(tokenizer.tokenize(inputValue));
-      const results = filterSuggestionsBM25(tokenizer, candidates, tokens);
-
-      if (cancelled) {
-        return;
-      }
-
-      setQueryTokens(tokens);
       setSuggestions(results);
       setShowSuggestions(results.length > 0);
     };
@@ -144,7 +104,7 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
     return () => {
       cancelled = true;
     };
-  }, [inputValue, tokenizer]);
+  }, [inputValue]);
 
   const adjustTextareaHeight = () => {
     const textarea = textareaRef.current;
@@ -169,7 +129,6 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
   const handleSuggestionClick = (suggestion: string) => {
     setInputValue(suggestion);
     setSuggestions([]);
-    setQueryTokens([]);
     setShowSuggestions(false);
   };
 
@@ -179,7 +138,6 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
       onSendMessage(inputValue.trim());
       setInputValue("");
       setSuggestions([]);
-      setQueryTokens([]);
       setShowSuggestions(false);
       resetTextareaHeight();
     }
@@ -191,6 +149,8 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
       handleSubmit(e);
     }
   };
+
+  const queryTokens = inputValue.trim().split(/\s+/).filter(Boolean);
 
   return (
     <div className="border-cax-border bg-cax-surface sticky bottom-12 border-t px-4 py-4 lg:bottom-0">
