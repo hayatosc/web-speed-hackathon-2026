@@ -69,9 +69,9 @@ function formatPost(post: {
   const { userId, movieId, soundId, postImages, user, ...postData } = post;
   const { profileImageId, password, ...userData } = user;
 
-  // Sort images by createdAt
+  // Sort images by createdAt using string comparison (ISO strings sort correctly)
   const sortedImages = [...postImages]
-    .sort((a, b) => new Date(a.image.createdAt).getTime() - new Date(b.image.createdAt).getTime())
+    .sort((a, b) => (a.image.createdAt < b.image.createdAt ? -1 : a.image.createdAt > b.image.createdAt ? 1 : 0))
     .map((pi) => pi.image);
 
   return {
