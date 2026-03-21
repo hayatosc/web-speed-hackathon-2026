@@ -1,14 +1,14 @@
-import * as fs from "node:fs/promises";
-import * as os from "node:os";
-import * as path from "node:path";
+import * as fs from 'node:fs/promises';
+import * as os from 'node:os';
+import * as path from 'node:path';
 
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import Database from 'better-sqlite3';
+import { drizzle } from 'drizzle-orm/better-sqlite3';
 
-import { DATABASE_PATH } from "@web-speed-hackathon-2026/server/src/paths";
-import { isBcryptHash, normalizeStoredPassword } from "@web-speed-hackathon-2026/server/src/password";
+import { isBcryptHash, normalizeStoredPassword } from '@web-speed-hackathon-2026/server/src/password';
+import { DATABASE_PATH } from '@web-speed-hackathon-2026/server/src/paths';
 
-import * as schema from "./schema";
+import * as schema from './schema';
 
 export type DrizzleDB = ReturnType<typeof drizzle<typeof schema>>;
 
@@ -40,29 +40,33 @@ function ensureIndexes(sqlite: Database.Database): void {
   `);
 }
 
-function normalizeUserPasswords(sqlite: Database.Database): void {
-  const users = sqlite
-    .prepare("SELECT id, password FROM Users")
-    .all() as Array<{ id: string; password: string }>;
+async function normalizeUserPasswords(sqlite: Database.Database): Promise<void> {
+  const users = sqlite.prepare('SELECT id, password FROM Users').all() as Array<{ id: string; password: string }>;
   const usersToUpdate = users.filter((user) => !isBcryptHash(user.password));
 
   if (usersToUpdate.length === 0) {
     return;
   }
 
+  const updates: Array<{ id: string; password: string }> = [];
+  for (const user of usersToUpdate) {
+    const newPassword = await normalizeStoredPassword(user.password);
+    updates.push({ id: user.id, password: newPassword });
+  }
+
   const updatePassword = sqlite.prepare('UPDATE "Users" SET "password" = ? WHERE "id" = ?');
   const transaction = sqlite.transaction((targetUsers: Array<{ id: string; password: string }>) => {
     for (const user of targetUsers) {
-      updatePassword.run(normalizeStoredPassword(user.password), user.id);
+      updatePassword.run(user.password, user.id);
     }
   });
 
-  transaction(usersToUpdate);
+  transaction(updates);
 }
 
 export function getDb(): DrizzleDB {
   if (_db === null) {
-    throw new Error("Database not initialized. Call initializeDatabase() first.");
+    throw new Error('Database not initialized. Call initializeDatabase() first.');
   }
   return _db;
 }
@@ -76,14 +80,14 @@ export async function initializeDatabase(): Promise<void> {
   }
 
   // Create temp directory and copy database
-  const tempDir = await fs.mkdtemp(path.resolve(os.tmpdir(), "./wsh-"));
-  const tempPath = path.resolve(tempDir, "./database.sqlite");
+  const tempDir = await fs.mkdtemp(path.resolve(os.tmpdir(), './wsh-'));
+  const tempPath = path.resolve(tempDir, './database.sqlite');
   await fs.copyFile(DATABASE_PATH, tempPath);
 
   // Initialize better-sqlite3 and drizzle
   _sqlite = new Database(tempPath);
   ensureIndexes(_sqlite);
-  normalizeUserPasswords(_sqlite);
+  await normalizeUserPasswords(_sqlite);
   _db = drizzle(_sqlite, { schema });
 }
 
