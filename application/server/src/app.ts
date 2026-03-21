@@ -13,9 +13,9 @@ const app = new Hono<HonoEnv>();
 const { upgradeWebSocket, injectWebSocket } = createNodeWebSocket({ app });
 
 app.use(compress());
-app.use(sessionMiddleware);
-app.route("/api/v1", createApiRouter(upgradeWebSocket));
 app.route("/", staticRouter);
+app.use("/api/*", sessionMiddleware);
+app.route("/api/v1", createApiRouter(upgradeWebSocket));
 
 export { injectWebSocket };
 export default app;

@@ -1,6 +1,7 @@
 import {
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -98,10 +99,13 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
       setShowSuggestions(results.length > 0);
     };
 
-    void updateSuggestions();
+    const timerId = setTimeout(() => {
+      void updateSuggestions();
+    }, 300);
 
     return () => {
       cancelled = true;
+      clearTimeout(timerId);
     };
   }, [inputValue]);
 
@@ -149,7 +153,11 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
     }
   };
 
-  const queryTokens = inputValue.trim().split(/\s+/).filter(Boolean);
+  const queryTokens = useMemo(() => inputValue.trim().split(/\s+/).filter(Boolean), [inputValue]);
+  const highlightedSuggestions = useMemo(
+    () => suggestions.map((s) => ({ text: s, node: highlightMatchByTokens(s, queryTokens) })),
+    [suggestions, queryTokens],
+  );
 
   return (
     <div className="border-cax-border bg-cax-surface sticky bottom-12 border-t px-4 py-4 lg:bottom-0">
@@ -161,14 +169,14 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
             role="listbox"
             aria-label="サジェスト候補"
           >
-            {suggestions.map((suggestion, index) => (
+            {highlightedSuggestions.map(({ text, node }, index) => (
               <button
                 key={index}
                 type="button"
                 className="border-cax-border text-cax-text-muted hover:bg-cax-surface-subtle w-full border-b px-4 py-2 text-left text-sm last:border-b-0"
-                onClick={() => handleSuggestionClick(suggestion)}
+                onClick={() => handleSuggestionClick(text)}
               >
-                {highlightMatchByTokens(suggestion, queryTokens)}
+                {node}
               </button>
             ))}
           </div>

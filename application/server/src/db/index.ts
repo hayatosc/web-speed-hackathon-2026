@@ -86,6 +86,7 @@ export async function initializeDatabase(): Promise<void> {
 
   // Initialize better-sqlite3 and drizzle
   _sqlite = new Database(tempPath);
+  _sqlite.pragma('journal_mode = WAL');
   ensureIndexes(_sqlite);
   await normalizeUserPasswords(_sqlite);
   _db = drizzle(_sqlite, { schema });

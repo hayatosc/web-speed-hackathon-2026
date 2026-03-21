@@ -87,9 +87,9 @@ function formatPost(post: {
   const { userId, movieId, soundId, postImages, user, ...postData } = post;
   const { profileImageId, password, ...userData } = user;
 
-  // Sort images by createdAt
+  // Sort images by createdAt using string comparison (ISO strings sort correctly)
   const sortedImages = [...postImages]
-    .sort((a, b) => new Date(a.image.createdAt).getTime() - new Date(b.image.createdAt).getTime())
+    .sort((a, b) => (a.image.createdAt < b.image.createdAt ? -1 : a.image.createdAt > b.image.createdAt ? 1 : 0))
     .map((pi) => pi.image);
 
   return {
@@ -132,7 +132,7 @@ router.get('/posts', async (c) => {
   const db = getDb();
   const limitStr = c.req.query('limit');
   const offsetStr = c.req.query('offset');
-  const limit = limitStr != null ? Number(limitStr) : undefined;
+  const limit = limitStr != null ? Number(limitStr) : 20;
   const offset = offsetStr != null ? Number(offsetStr) : 0;
 
   const postsResult = await db.query.posts.findMany({
@@ -171,7 +171,7 @@ router.get('/posts/:postId/comments', async (c) => {
   const db = getDb();
   const limitStr = c.req.query('limit');
   const offsetStr = c.req.query('offset');
-  const limit = limitStr != null ? Number(limitStr) : undefined;
+  const limit = limitStr != null ? Number(limitStr) : 20;
   const offset = offsetStr != null ? Number(offsetStr) : 0;
 
   const commentsResult = await db.query.comments.findMany({

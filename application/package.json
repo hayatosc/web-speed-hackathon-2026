@@ -18,7 +18,6 @@
     "@ffmpeg/core": "0.12.10",
     "@ffmpeg/ffmpeg": "0.12.15",
     "@imagemagick/magick-wasm": "0.0.37",
-    "@mlc-ai/web-llm": "0.2.80",
     "@react-router/dev": "7.9.4",
     "@react-router/node": "7.9.4",
     "@web-speed-hackathon-2026/client": "workspace:*",
