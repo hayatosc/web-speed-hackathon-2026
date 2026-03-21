@@ -11,9 +11,11 @@ import type { HonoEnv } from "../../types";
 const router = new Hono<HonoEnv>();
 
 router.post("/initialize", async (c) => {
-  await initializeDatabase();
   sessionStore.clear();
-  await fs.rm(UPLOAD_PATH, { force: true, recursive: true });
+  await Promise.all([
+    initializeDatabase(),
+    fs.rm(UPLOAD_PATH, { force: true, recursive: true }),
+  ]);
   return c.json({});
 });
 
