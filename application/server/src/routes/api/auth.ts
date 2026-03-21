@@ -52,20 +52,34 @@ router.post('/signup', async (c) => {
 
   const userId = randomUUID();
   const now = new Date().toISOString();
+  const profileImageId = typeof body.profileImageId === 'string' && body.profileImageId.length > 0
+    ? body.profileImageId
+    : '396fe4ce-aa36-4d96-b54e-6db40bae2eed';
+
+  const [hashedPassword, profileImage] = await Promise.all([
+    hashPassword(body.password),
+    db.query.images.findFirst({ where: eq(schema.images.id, profileImageId), columns: { id: true, alt: true } }),
+  ]);
 
   await db.insert(schema.users).values({
     id: userId,
     username: body.username,
     name: body.name ?? '',
     description: body.description ?? '',
-    password: await hashPassword(body.password),
-    profileImageId: body.profileImageId ?? '396fe4ce-aa36-4d96-b54e-6db40bae2eed',
+    password: hashedPassword,
+    profileImageId,
     createdAt: now,
   });
 
-  const user = await getUserWithProfileImage(userId);
   c.get('session').userId = userId;
-  return c.json(user);
+  return c.json({
+    id: userId,
+    username: body.username,
+    name: body.name ?? '',
+    description: body.description ?? '',
+    createdAt: now,
+    profileImage: profileImage ?? null,
+  });
 });
 
 router.post('/signin', async (c) => {

@@ -585,15 +585,25 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
 
     const conversationId = c.req.param('conversationId');
 
-    const conversation = await db.query.directMessageConversations.findFirst({
-      where: and(
-        eq(schema.directMessageConversations.id, conversationId),
-        or(eq(schema.directMessageConversations.initiatorId, userId), eq(schema.directMessageConversations.memberId, userId)),
-      ),
-    });
+    const [conversation, sender] = await Promise.all([
+      db.query.directMessageConversations.findFirst({
+        where: and(
+          eq(schema.directMessageConversations.id, conversationId),
+          or(eq(schema.directMessageConversations.initiatorId, userId), eq(schema.directMessageConversations.memberId, userId)),
+        ),
+      }),
+      db.query.users.findFirst({
+        where: eq(schema.users.id, userId),
+        with: { profileImage: true },
+      }),
+    ]);
 
     if (!conversation) {
       throw new HTTPException(404);
+    }
+
+    if (!sender) {
+      throw new HTTPException(401);
     }
 
     const messageId = randomUUID();
@@ -612,21 +622,16 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
     // Emit events after message creation (replaces Sequelize hook)
     await emitDmEvents(messageId);
 
-    const message = await db.query.directMessages.findFirst({
-      where: eq(schema.directMessages.id, messageId),
-      with: {
-        sender: {
-          with: {
-            profileImage: true,
-          },
-        },
-      },
-    });
-
-    if (message === undefined) {
-      throw new HTTPException(500);
-    }
-    return c.json(formatDirectMessage(message), 201);
+    return c.json(formatDirectMessage({
+      id: messageId,
+      conversationId: conversation.id,
+      senderId: userId,
+      body: bodyText.trim(),
+      isRead: false,
+      createdAt: now,
+      updatedAt: now,
+      sender,
+    }), 201);
   });
 
   router.post('/dm/:conversationId/read', async (c) => {
