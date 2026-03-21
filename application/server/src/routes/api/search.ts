@@ -82,7 +82,7 @@ router.get("/search", async (c) => {
   const searchTerm = keywords ? `%${keywords}%` : null;
   const limitStr = c.req.query("limit");
   const offsetStr = c.req.query("offset");
-  const limit = limitStr != null ? Number(limitStr) : undefined;
+  const limit = limitStr != null ? Number(limitStr) : 20;
   const offset = offsetStr != null ? Number(offsetStr) : 0;
 
   // Build date conditions

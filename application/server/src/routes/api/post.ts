@@ -114,7 +114,7 @@ router.get('/posts', async (c) => {
   const db = getDb();
   const limitStr = c.req.query('limit');
   const offsetStr = c.req.query('offset');
-  const limit = limitStr != null ? Number(limitStr) : undefined;
+  const limit = limitStr != null ? Number(limitStr) : 20;
   const offset = offsetStr != null ? Number(offsetStr) : 0;
 
   const postsResult = await db.query.posts.findMany({
@@ -153,7 +153,7 @@ router.get('/posts/:postId/comments', async (c) => {
   const db = getDb();
   const limitStr = c.req.query('limit');
   const offsetStr = c.req.query('offset');
-  const limit = limitStr != null ? Number(limitStr) : undefined;
+  const limit = limitStr != null ? Number(limitStr) : 20;
   const offset = offsetStr != null ? Number(offsetStr) : 0;
 
   const commentsResult = await db.query.comments.findMany({
