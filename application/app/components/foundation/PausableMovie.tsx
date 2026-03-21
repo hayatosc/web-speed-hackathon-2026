@@ -7,13 +7,14 @@ import { useNearScreen } from "@web-speed-hackathon-2026/client/app/hooks/use_ne
 
 interface Props {
   src: string;
+  priority?: boolean;
 }
 
 /**
  * クリックすると再生・一時停止を切り替えます。
  */
-export const PausableMovie = ({ src }: Props) => {
-  const { isNearScreen, ref: containerRef } = useNearScreen<HTMLDivElement>();
+export const PausableMovie = ({ src, priority = false }: Props) => {
+  const { isNearScreen, ref: containerRef } = useNearScreen<HTMLDivElement>({ initialValue: priority });
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
@@ -84,7 +85,7 @@ export const PausableMovie = ({ src }: Props) => {
           data-prevent-post-navigation="true"
         >
           {!isReady && <div aria-hidden="true" className="bg-cax-surface-subtle h-full w-full" />}
-          {isNearScreen ? (
+          {isNearScreen || priority ? (
             <video
               ref={videoRef}
               className={classNames("absolute inset-0 h-full w-full object-cover", {
@@ -94,7 +95,7 @@ export const PausableMovie = ({ src }: Props) => {
               muted
               onLoadedMetadata={handleLoadedMetadata}
               playsInline
-              preload="metadata"
+              preload={priority ? "auto" : "metadata"}
               src={src}
             />
           ) : null}

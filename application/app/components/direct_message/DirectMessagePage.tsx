@@ -116,6 +116,7 @@ export const DirectMessagePage = ({
           }
           className="h-12 w-12 rounded-full object-cover"
           fallbackSrc={getProfileImagePath(peer.profileImage.id)}
+          fetchPriority="high"
           height={peer.profileImage.height}
           width={peer.profileImage.width}
         />

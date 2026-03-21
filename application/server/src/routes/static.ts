@@ -67,6 +67,23 @@ router.use("*", async (c, next) => {
   return;
 });
 
+// メディアファイルにキャッシュヘッダーを付与するミドルウェア
+router.use("*", async (c, next) => {
+  await next();
+  const pathname = new URL(c.req.url).pathname;
+  if (
+    c.res.status === 200 &&
+    /\.(avif|jpg|jpeg|png|gif|webp|mp3|webm|mp4)$/.test(pathname)
+  ) {
+    const newHeaders = new Headers(c.res.headers);
+    newHeaders.set("Cache-Control", "public, max-age=31536000, immutable");
+    c.res = new Response(c.res.body, {
+      status: c.res.status,
+      headers: newHeaders,
+    });
+  }
+});
+
 // アップロードファイル配信
 router.use(
   "*",

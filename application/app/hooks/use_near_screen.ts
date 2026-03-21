@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 
 interface Options {
+  initialValue?: boolean;
   once?: boolean;
   rootMargin?: string;
 }
 
 export function useNearScreen<T extends Element>({
+  initialValue = false,
   once = true,
   rootMargin = "240px",
 }: Options = {}) {
   const ref = useRef<T | null>(null);
-  const [isNearScreen, setIsNearScreen] = useState(false);
+  const [isNearScreen, setIsNearScreen] = useState(initialValue);
 
   useEffect(() => {
     if (once && isNearScreen) {

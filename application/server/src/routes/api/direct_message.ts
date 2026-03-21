@@ -454,10 +454,11 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
 
       const messages = await db.query.directMessages.findMany({
         where: eq(schema.directMessages.conversationId, conversation.id),
-        orderBy: (directMessages, { asc }) => [asc(directMessages.createdAt)],
+        orderBy: (directMessages, { desc }) => [desc(directMessages.createdAt)],
+        limit: 100,
       });
 
-      return c.json(formatConversationWithParticipants(conversation, messages));
+      return c.json(formatConversationWithParticipants(conversation, messages.reverse()));
     }
 
     let conversation = await db.query.directMessageConversations.findFirst({
@@ -573,12 +574,15 @@ export function createDirectMessageRouter(upgradeWebSocket: UpgradeWS) {
       throw new HTTPException(404);
     }
 
+    const limitStr = c.req.query('limit');
+    const limit = limitStr != null ? Math.min(Number(limitStr), 500) : 100;
     const messages = await db.query.directMessages.findMany({
       where: eq(schema.directMessages.conversationId, conversation.id),
-      orderBy: (directMessages, { asc }) => [asc(directMessages.createdAt)],
+      orderBy: (directMessages, { desc }) => [desc(directMessages.createdAt)],
+      limit,
     });
 
-    return c.json(formatConversationWithParticipants(conversation, messages));
+    return c.json(formatConversationWithParticipants(conversation, messages.reverse()));
   });
 
   router.get(
