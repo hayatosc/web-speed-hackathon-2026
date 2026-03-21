@@ -1,5 +1,27 @@
 @import "tailwindcss";
-@import "../src/index.css";
+@import "normalize.css" layer(normalize);
+
+@layer normalize, theme, base, components, utilities;
+
+@font-face {
+  font-family: "Rei no Are Mincho";
+  font-display: block;
+  src: url(/fonts/ReiNoAreMincho-Regular.otf) format("opentype");
+  font-weight: normal;
+}
+
+@font-face {
+  font-family: "Rei no Are Mincho";
+  font-display: block;
+  src: url(/fonts/ReiNoAreMincho-Heavy.otf) format("opentype");
+  font-weight: bold;
+}
+
+.font-awesome {
+  height: 1em;
+  vertical-align: -0.125em;
+  width: 1em;
+}
 
 @layer base {
   button:not(:disabled),
