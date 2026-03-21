@@ -4,3 +4,6 @@ node_modules
 
 application/server/seeds
 application/server/upload
+application/e2e/src
+application/build
+application/server/dist
