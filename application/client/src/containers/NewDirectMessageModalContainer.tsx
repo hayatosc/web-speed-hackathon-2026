@@ -44,6 +44,7 @@ export const NewDirectMessageModalContainer = ({ activeUser, existingConversatio
         });
 
         if (existingConversation !== undefined) {
+          ref.current?.close();
           navigate(`/dm/${existingConversation.id}`);
           return;
         }
@@ -55,6 +56,7 @@ export const NewDirectMessageModalContainer = ({ activeUser, existingConversatio
             peerId: user.id,
           },
         );
+        ref.current?.close();
         navigate(`/dm/${conversation.id}`);
       } catch {
         throw new SubmissionError({
