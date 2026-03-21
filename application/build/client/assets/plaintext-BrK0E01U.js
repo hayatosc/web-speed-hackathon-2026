@@ -1,0 +1,1 @@
+import{o as e,t}from"./chunk-1p1EYVQ2.js";var n=e(t(((e,t)=>{function n(e){return{name:`Plain text`,aliases:[`text`,`txt`],disableAutodetect:!0}}t.exports=n}))()).default;export{n as default};

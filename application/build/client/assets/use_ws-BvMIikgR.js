@@ -1,0 +1,1 @@
+import{o as e}from"./chunk-1p1EYVQ2.js";import{t}from"./react-BMWhuGU6.js";var n=e(t(),1);function r(e,t){let r=(0,n.useEffectEvent)(e=>{t(JSON.parse(e.data))});(0,n.useEffect)(()=>{let t=new WebSocket(e);return t.addEventListener(`message`,r),()=>{t.removeEventListener(`message`,r),t.close()}},[e])}export{r as t};

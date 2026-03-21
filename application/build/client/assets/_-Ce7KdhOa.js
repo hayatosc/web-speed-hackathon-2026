@@ -1,0 +1,1 @@
+import"./react-BMWhuGU6.js";import{j as e}from"./chunk-OIYGIGL5-DDDOLv3B.js";import{t}from"./jsx-runtime-P6oPgn4Y.js";import{t as n}from"./NotFoundContainer-DtE0FzFK.js";var r=t();function i(){return[{title:`ページが見つかりません - CaX`}]}var a=e(function(){return(0,r.jsx)(n,{})});export{a as default,i as meta};
