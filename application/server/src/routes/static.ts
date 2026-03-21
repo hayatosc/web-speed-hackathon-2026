@@ -91,15 +91,4 @@ router.use(
   }),
 );
 
-// SPA フォールバック
-router.use("*", async (c) => {
-  const indexPath = path.join(CLIENT_DIST_PATH, "index.html");
-  try {
-    const html = await fs.readFile(indexPath, "utf-8");
-    return c.html(html);
-  } catch {
-    return c.text("Not Found", 404);
-  }
-});
-
 export { router as staticRouter };

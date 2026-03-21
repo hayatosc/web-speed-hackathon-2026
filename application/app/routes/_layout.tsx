@@ -1,0 +1,68 @@
+import { useCallback, useEffect, useId, useState } from "react";
+import { Outlet, useNavigate, useOutletContext, useLocation } from "react-router";
+import { Provider } from "react-redux";
+
+import { AppPage } from "@web-speed-hackathon-2026/client/src/components/application/AppPage";
+import { AuthModalContainer } from "@web-speed-hackathon-2026/client/src/containers/AuthModalContainer";
+import { NewPostModalContainer } from "@web-speed-hackathon-2026/client/src/containers/NewPostModalContainer";
+import { createAppStore } from "@web-speed-hackathon-2026/client/src/store";
+import { fetchJSON, sendJSON } from "@web-speed-hackathon-2026/client/src/utils/fetchers";
+
+export type LayoutOutletContext = {
+  activeUser: Models.User | null;
+  setActiveUser: (user: Models.User | null) => void;
+  authModalId: string;
+};
+
+export function useLayoutOutletContext(): LayoutOutletContext {
+  return useOutletContext<LayoutOutletContext>();
+}
+
+export default function Layout() {
+  const [store] = useState(() => createAppStore());
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    window.history.scrollRestoration = "manual";
+  }, []);
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  const [activeUser, setActiveUser] = useState<Models.User | null>(null);
+  useEffect(() => {
+    void fetchJSON<Models.User>("/api/v1/me")
+      .then((user) => {
+        setActiveUser(user);
+      })
+      .catch(() => {
+        setActiveUser(null);
+      });
+  }, []);
+
+  const authModalId = useId();
+  const newPostModalId = useId();
+
+  const handleLogout = useCallback(async () => {
+    await sendJSON("/api/v1/signout", {});
+    setActiveUser(null);
+    navigate("/");
+  }, [navigate]);
+
+  return (
+    <Provider store={store}>
+      <AppPage
+        activeUser={activeUser}
+        authModalId={authModalId}
+        newPostModalId={newPostModalId}
+        onLogout={handleLogout}
+      >
+        <Outlet context={{ activeUser, setActiveUser, authModalId } satisfies LayoutOutletContext} />
+      </AppPage>
+      <AuthModalContainer id={authModalId} onUpdateActiveUser={setActiveUser} />
+      <NewPostModalContainer id={newPostModalId} />
+    </Provider>
+  );
+}
