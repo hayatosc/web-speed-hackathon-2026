@@ -74,7 +74,6 @@ export default defineConfig(async () => {
         "@ffmpeg/ffmpeg",
         "@ffmpeg/core",
         "@imagemagick/magick-wasm",
-        "@mlc-ai/web-llm",
       ],
     },
   };
