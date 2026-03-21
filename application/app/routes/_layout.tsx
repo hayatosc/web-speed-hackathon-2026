@@ -1,10 +1,15 @@
-import { Fragment, useCallback, useEffect, useId, useState } from "react";
+import { Fragment, Suspense, lazy, useCallback, useEffect, useId, useState } from "react";
 import { Outlet, useNavigate, useOutletContext, useLocation } from "react-router";
 
 import { AppPage } from "@web-speed-hackathon-2026/client/app/components/application/AppPage";
-import { AuthModalContainer } from "@web-speed-hackathon-2026/client/app/containers/AuthModalContainer";
-import { NewPostModalContainer } from "@web-speed-hackathon-2026/client/app/containers/NewPostModalContainer";
 import { fetchJSON, sendJSON } from "@web-speed-hackathon-2026/client/app/utils/fetchers";
+
+const AuthModalContainer = lazy(() =>
+  import("@web-speed-hackathon-2026/client/app/containers/AuthModalContainer").then((m) => ({ default: m.AuthModalContainer }))
+);
+const NewPostModalContainer = lazy(() =>
+  import("@web-speed-hackathon-2026/client/app/containers/NewPostModalContainer").then((m) => ({ default: m.NewPostModalContainer }))
+);
 
 export type LayoutOutletContext = {
   activeUser: Models.User | null;
@@ -58,8 +63,10 @@ export default function Layout() {
       >
         <Outlet context={{ activeUser, setActiveUser, authModalId } satisfies LayoutOutletContext} />
       </AppPage>
-      <AuthModalContainer id={authModalId} onUpdateActiveUser={setActiveUser} />
-      <NewPostModalContainer id={newPostModalId} />
+      <Suspense>
+        <AuthModalContainer id={authModalId} onUpdateActiveUser={setActiveUser} />
+        <NewPostModalContainer id={newPostModalId} />
+      </Suspense>
     </Fragment>
   );
 }
