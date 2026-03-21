@@ -1,8 +1,6 @@
-import "katex/dist/katex.min.css";
+import { useEffect, useState } from "react";
 import Markdown from "react-markdown";
-import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
-import remarkMath from "remark-math";
 
 import { CodeBlock } from "@web-speed-hackathon-2026/client/src/components/crok/CodeBlock";
 import { TypingIndicator } from "@web-speed-hackathon-2026/client/src/components/crok/TypingIndicator";
@@ -11,6 +9,19 @@ import { CrokLogo } from "@web-speed-hackathon-2026/client/src/components/founda
 interface Props {
   message: Models.ChatMessage;
 }
+
+const loadMathPlugins = () =>
+  import("@web-speed-hackathon-2026/client/src/components/crok/load_math_plugins");
+
+const hasMathSyntax = (content: string) => {
+  return (
+    /(^|[^\\])\$\$[\s\S]+?\$\$/m.test(content) ||
+    /(^|[^\\])\$[^$\n]+\$/m.test(content) ||
+    /\\\([\s\S]+?\\\)/.test(content) ||
+    /\\\[[\s\S]+?\\\]/.test(content) ||
+    /\\begin\{[a-zA-Z*]+\}/.test(content)
+  );
+};
 
 const UserMessage = ({ content }: { content: string }) => {
   return (
@@ -23,6 +34,26 @@ const UserMessage = ({ content }: { content: string }) => {
 };
 
 const AssistantMessage = ({ content }: { content: string }) => {
+  const [mathPlugins, setMathPlugins] = useState<Awaited<ReturnType<typeof loadMathPlugins>> | null>(null);
+  const shouldLoadMath = hasMathSyntax(content);
+
+  useEffect(() => {
+    if (!shouldLoadMath) {
+      return;
+    }
+
+    let isMounted = true;
+    void loadMathPlugins().then((plugins) => {
+      if (isMounted) {
+        setMathPlugins(plugins);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [shouldLoadMath]);
+
   return (
     <div className="mb-6 flex gap-4">
       <div className="h-8 w-8 shrink-0">
@@ -34,8 +65,9 @@ const AssistantMessage = ({ content }: { content: string }) => {
           {content ? (
             <Markdown
               components={{ pre: CodeBlock }}
-              rehypePlugins={[rehypeKatex]}
-              remarkPlugins={[remarkMath, remarkGfm]}
+              key={content}
+              rehypePlugins={shouldLoadMath && mathPlugins ? [mathPlugins.rehypeKatex] : []}
+              remarkPlugins={shouldLoadMath && mathPlugins ? [mathPlugins.remarkMath, remarkGfm] : [remarkGfm]}
             >
               {content}
             </Markdown>

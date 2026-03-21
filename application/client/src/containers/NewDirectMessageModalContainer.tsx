@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
-import { SubmissionError } from "redux-form";
 
 import { NewDirectMessageModalPage } from "@web-speed-hackathon-2026/client/src/components/direct_message/NewDirectMessageModalPage";
 import { Modal } from "@web-speed-hackathon-2026/client/src/components/modal/Modal";
@@ -57,9 +56,7 @@ export const NewDirectMessageModalContainer = ({ activeUser, existingConversatio
         );
         navigate(`/dm/${conversation.id}`);
       } catch {
-        throw new SubmissionError({
-          _error: "ユーザーが見つかりませんでした",
-        });
+        throw new Error("ユーザーが見つかりませんでした");
       }
     },
     [activeUser.id, existingConversations, navigate],

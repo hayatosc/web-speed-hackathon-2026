@@ -81,12 +81,7 @@ export const SearchContainer = () => {
       <Helmet>
         <title>検索 - CaX</title>
       </Helmet>
-      <SearchPage
-        query={query}
-        results={posts}
-        sentiment={searchResult.sentiment}
-        initialValues={{ searchText: query }}
-      />
+      <SearchPage query={query} results={posts} sentiment={searchResult.sentiment} />
     </InfiniteScroll>
   );
 };

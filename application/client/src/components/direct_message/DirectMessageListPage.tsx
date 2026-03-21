@@ -1,8 +1,7 @@
-import moment from "moment";
-
 import { Button } from "@web-speed-hackathon-2026/client/src/components/foundation/Button";
 import { FontAwesomeIcon } from "@web-speed-hackathon-2026/client/src/components/foundation/FontAwesomeIcon";
 import { Link } from "@web-speed-hackathon-2026/client/src/components/foundation/Link";
+import { formatRelativeTime, toISOString } from "@web-speed-hackathon-2026/client/src/utils/format_long_date";
 import { getProfileImagePath } from "@web-speed-hackathon-2026/client/src/utils/get_path";
 
 interface Props {
@@ -41,11 +40,16 @@ export const DirectMessageListPage = ({ activeUser, conversations, error, newDmM
       ) : (
         <ul data-testid="dm-list">
           {conversations.map((conversation) => {
+            const { messages } = conversation;
             const peer =
               conversation.initiator.id !== activeUser.id
                 ? conversation.initiator
                 : conversation.member;
-            const { hasUnread, lastMessage } = conversation;
+
+            const lastMessage = messages.at(-1);
+            const hasUnread = messages
+              .filter((m) => m.sender.id === peer.id)
+              .some((m) => !m.isRead);
 
             return (
               <li className="grid" key={conversation.id}>
@@ -54,9 +58,7 @@ export const DirectMessageListPage = ({ activeUser, conversations, error, newDmM
                     <img
                       alt={peer.profileImage.alt}
                       className="w-12 shrink-0 self-start rounded-full"
-                      height={48}
                       src={getProfileImagePath(peer.profileImage.id)}
-                      width={48}
                     />
                     <div className="flex flex-1 flex-col">
                       <div className="flex items-center justify-between">
@@ -67,9 +69,9 @@ export const DirectMessageListPage = ({ activeUser, conversations, error, newDmM
                         {lastMessage != null && (
                           <time
                             className="text-cax-text-subtle text-xs"
-                            dateTime={lastMessage.createdAt}
+                            dateTime={toISOString(lastMessage.createdAt)}
                           >
-                            {moment(lastMessage.createdAt).locale("ja").fromNow()}
+                            {formatRelativeTime(lastMessage.createdAt)}
                           </time>
                         )}
                       </div>

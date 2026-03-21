@@ -5,6 +5,25 @@ interface ParsedData {
   peaks: number[];
 }
 
+const average = (values: number[]) => {
+  if (values.length === 0) {
+    return 0;
+  }
+
+  const total = values.reduce((sum, value) => sum + value, 0);
+  return total / values.length;
+};
+
+const chunk = <T,>(values: T[], size: number) => {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+};
+
 async function calculate(data: ArrayBuffer): Promise<ParsedData> {
   const AudioContextImpl =
     window.AudioContext ??

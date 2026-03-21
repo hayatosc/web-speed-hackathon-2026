@@ -1,11 +1,9 @@
-import moment from "moment";
-
 import { Link } from "@web-speed-hackathon-2026/client/src/components/foundation/Link";
 import { ImageArea } from "@web-speed-hackathon-2026/client/src/components/post/ImageArea";
 import { MovieArea } from "@web-speed-hackathon-2026/client/src/components/post/MovieArea";
 import { SoundArea } from "@web-speed-hackathon-2026/client/src/components/post/SoundArea";
 import { TranslatableText } from "@web-speed-hackathon-2026/client/src/components/post/TranslatableText";
-import { formatLongDate } from "@web-speed-hackathon-2026/client/src/utils/format_long_date";
+import { formatLongDate, toISOString } from "@web-speed-hackathon-2026/client/src/utils/format_long_date";
 import { getProfileImagePath } from "@web-speed-hackathon-2026/client/src/utils/get_path";
 
 interface Props {
@@ -24,9 +22,7 @@ export const PostItem = ({ post }: Props) => {
             >
               <img
                 alt={post.user.profileImage.alt}
-                height={56}
                 src={getProfileImagePath(post.user.profileImage.id)}
-                width={56}
               />
             </Link>
           </div>
@@ -70,7 +66,7 @@ export const PostItem = ({ post }: Props) => {
           ) : null}
           <p className="mt-2 text-sm sm:mt-4">
             <Link className="text-cax-text-muted hover:underline" to={`/posts/${post.id}`}>
-              <time dateTime={moment(post.createdAt).toISOString()}>
+              <time dateTime={toISOString(post.createdAt)}>
                 {formatLongDate(post.createdAt)}
               </time>
             </Link>

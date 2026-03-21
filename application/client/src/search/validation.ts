@@ -1,9 +1,8 @@
-import { FormErrors } from "redux-form";
-
 import {
   parseSearchQuery,
   isValidDate,
 } from "@web-speed-hackathon-2026/client/src/search/services";
+import { FormErrors } from "@web-speed-hackathon-2026/client/src/form/types";
 import { SearchFormData } from "@web-speed-hackathon-2026/client/src/search/types";
 
 export const validate = (values: SearchFormData): FormErrors<SearchFormData> => {

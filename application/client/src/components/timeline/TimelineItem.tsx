@@ -1,4 +1,3 @@
-import moment from "moment";
 import { MouseEventHandler, useCallback } from "react";
 import { Link, useNavigate } from "react-router";
 
@@ -6,7 +5,7 @@ import { ImageArea } from "@web-speed-hackathon-2026/client/src/components/post/
 import { MovieArea } from "@web-speed-hackathon-2026/client/src/components/post/MovieArea";
 import { SoundArea } from "@web-speed-hackathon-2026/client/src/components/post/SoundArea";
 import { TranslatableText } from "@web-speed-hackathon-2026/client/src/components/post/TranslatableText";
-import { formatLongDate } from "@web-speed-hackathon-2026/client/src/utils/format_long_date";
+import { formatLongDate, toISOString } from "@web-speed-hackathon-2026/client/src/utils/format_long_date";
 import { getProfileImagePath } from "@web-speed-hackathon-2026/client/src/utils/get_path";
 
 const isClickedAnchorOrButton = (target: EventTarget | null, currentTarget: Element): boolean => {
@@ -57,10 +56,7 @@ export const TimelineItem = ({ post }: Props) => {
           >
             <img
               alt={post.user.profileImage.alt}
-              className="h-full w-full object-cover"
-              height={64}
               src={getProfileImagePath(post.user.profileImage.id)}
-              width={64}
             />
           </Link>
         </div>
@@ -84,7 +80,7 @@ export const TimelineItem = ({ post }: Props) => {
               state={{ post }}
               to={`/posts/${post.id}`}
             >
-              <time dateTime={moment(post.createdAt).toISOString()}>
+              <time dateTime={toISOString(post.createdAt)}>
                 {formatLongDate(post.createdAt)}
               </time>
             </Link>

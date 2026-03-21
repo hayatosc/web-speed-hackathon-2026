@@ -1,8 +1,8 @@
-import { useMemo } from "react";
+import { ComponentPropsWithoutRef, useMemo } from "react";
 import { useNavigate } from "react-router";
-import { Field, InjectedFormProps, reduxForm, SubmissionError, WrappedFieldProps } from "redux-form";
 
 import { Timeline } from "@web-speed-hackathon-2026/client/src/components/timeline/Timeline";
+import { useForm } from "@web-speed-hackathon-2026/client/src/hooks/use_form";
 import {
   parseSearchQuery,
   sanitizeSearchText,
@@ -18,40 +18,43 @@ interface Props {
   sentiment: Models.Sentiment | null;
 }
 
-const SearchInput = ({ input, meta }: WrappedFieldProps) => (
-  <div className="flex flex-1 flex-col">
-    {(() => {
-      const errorMessage =
-        meta.error ??
-        (meta as WrappedFieldProps["meta"] & { submitError?: string }).submitError;
-      const showError = errorMessage != null && (meta.touched || meta.submitFailed);
+interface SearchInputProps extends Omit<ComponentPropsWithoutRef<"input">, "children"> {
+  error?: string;
+}
 
-      return (
-        <>
-          <input
-            {...input}
-            className={`flex-1 rounded border px-4 py-2 focus:outline-none ${
-              showError
-                ? "border-cax-danger focus:border-cax-danger"
-                : "border-cax-border focus:border-cax-brand-strong"
-            }`}
-            placeholder="検索 (例: キーワード since:2025-01-01 until:2025-12-31)"
-            type="text"
-          />
-          {showError && <span className="text-cax-danger mt-1 text-xs">{errorMessage}</span>}
-        </>
-      );
-    })()}
-  </div>
-);
+const SearchInput = ({ error, ...props }: SearchInputProps) => {
+  const shouldShowError = Boolean(error);
 
-const SearchPageComponent = ({
-  query,
-  results,
-  sentiment,
-  handleSubmit,
-}: Props & InjectedFormProps<SearchFormData, Props>) => {
+  return (
+    <div className="flex flex-1 flex-col">
+      <input
+        {...props}
+        className={`flex-1 rounded border px-4 py-2 focus:outline-none ${
+          shouldShowError
+            ? "border-cax-danger focus:border-cax-danger"
+            : "border-cax-border focus:border-cax-brand-strong"
+        }`}
+        placeholder="検索 (例: キーワード since:2025-01-01 until:2025-12-31)"
+        type="text"
+      />
+      {shouldShowError && <span className="text-cax-danger mt-1 text-xs">{error}</span>}
+    </div>
+  );
+};
+
+export const SearchPage = ({ query, results, sentiment }: Props) => {
   const navigate = useNavigate();
+  const { getFieldError, getInputProps, handleSubmit } = useForm<SearchFormData>({
+    initialValues: {
+      searchText: query,
+    },
+    onSubmit: (values) => {
+      const sanitizedText = sanitizeSearchText(values.searchText.trim());
+      navigate(`/search?q=${encodeURIComponent(sanitizedText)}`);
+    },
+    validate,
+  });
+
   const parsed = parseSearchQuery(query);
   const isNegative = sentiment?.label === "negative";
 
@@ -69,22 +72,12 @@ const SearchPageComponent = ({
     return parts.join(" ");
   }, [parsed]);
 
-  const onSubmit = (values: SearchFormData) => {
-    const errors = validate(values);
-    if (errors.searchText != null) {
-      throw new SubmissionError(errors);
-    }
-
-    const sanitizedText = sanitizeSearchText(values.searchText.trim());
-    navigate(`/search?q=${encodeURIComponent(sanitizedText)}`);
-  };
-
   return (
     <div className="flex flex-col gap-4">
       <div className="bg-cax-surface p-4 shadow">
-        <form onSubmit={handleSubmit(onSubmit)}>
+        <form onSubmit={handleSubmit}>
           <div className="flex gap-2">
-            <Field name="searchText" component={SearchInput} />
+            <SearchInput {...getInputProps("searchText")} error={getFieldError("searchText")} />
             <Button variant="primary" type="submit">
               検索
             </Button>
@@ -124,9 +117,3 @@ const SearchPageComponent = ({
     </div>
   );
 };
-
-export const SearchPage = reduxForm<SearchFormData, Props>({
-  form: "search",
-  enableReinitialize: true,
-  validate,
-})(SearchPageComponent);
