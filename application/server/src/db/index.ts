@@ -33,6 +33,10 @@ function ensureIndexes(sqlite: Database.Database): void {
       ON "DirectMessages" ("conversationId", "createdAt");
     CREATE INDEX IF NOT EXISTS "idx_direct_messages_conversation_sender_is_read"
       ON "DirectMessages" ("conversationId", "senderId", "isRead");
+    CREATE INDEX IF NOT EXISTS "idx_posts_created_at"
+      ON "Posts" ("createdAt");
+    CREATE INDEX IF NOT EXISTS "idx_posts_text"
+      ON "Posts" ("text");
   `);
 }
 

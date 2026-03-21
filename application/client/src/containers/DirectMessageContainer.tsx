@@ -18,7 +18,7 @@ interface DmTypingEvent {
   payload: {};
 }
 
-const TYPING_INDICATOR_DURATION_MS = 10 * 1000;
+const TYPING_INDICATOR_DURATION_MS = 3 * 1000;
 
 interface Props {
   activeUser: Models.User | null;

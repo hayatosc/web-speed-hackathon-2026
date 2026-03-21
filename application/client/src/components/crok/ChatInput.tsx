@@ -84,6 +84,7 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [queryTokens, setQueryTokens] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const suggestionsCacheRef = useRef<string[] | null>(null);
 
   // サジェストが更新されたら一番下にスクロール
   useLayoutEffect(() => {
@@ -120,10 +121,18 @@ export const ChatInput = ({ isStreaming, onSendMessage }: Props) => {
         return;
       }
 
-      const { suggestions: candidates } = await fetchJSON<{ suggestions: string[] }>(
-        "/api/v1/crok/suggestions",
-      );
+      if (suggestionsCacheRef.current === null) {
+        const { suggestions: candidates } = await fetchJSON<{ suggestions: string[] }>(
+          "/api/v1/crok/suggestions",
+        );
+        suggestionsCacheRef.current = candidates;
+      }
       if (cancelled) {
+        return;
+      }
+
+      const candidates = suggestionsCacheRef.current;
+      if (candidates === null) {
         return;
       }
 

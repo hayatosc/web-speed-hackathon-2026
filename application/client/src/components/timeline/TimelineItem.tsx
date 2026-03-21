@@ -1,4 +1,3 @@
-import moment from "moment";
 import { MouseEventHandler, useCallback } from "react";
 import { Link, useNavigate } from "react-router";
 
@@ -84,7 +83,7 @@ export const TimelineItem = ({ post }: Props) => {
               state={{ post }}
               to={`/posts/${post.id}`}
             >
-              <time dateTime={moment(post.createdAt).toISOString()}>
+              <time dateTime={new Date(post.createdAt).toISOString()}>
                 {formatLongDate(post.createdAt)}
               </time>
             </Link>

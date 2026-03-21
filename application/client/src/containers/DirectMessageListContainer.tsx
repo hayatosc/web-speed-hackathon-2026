@@ -43,7 +43,6 @@ export const DirectMessageListContainer = ({ activeUser, authModalId }: Props) =
     }
 
     void loadConversations();
-    void import("@web-speed-hackathon-2026/client/src/containers/DirectMessageContainer");
   }, [activeUser, loadConversations]);
 
   useWs("/api/v1/dm/unread", () => {
